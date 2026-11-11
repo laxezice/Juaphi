@@ -9,5 +9,5 @@ card.mp3, draw.mp3 = card-place-1.ogg
 สัญญาอนุญาต Pixabay Content License https://pixabay.com/service/license-summary/
 ghost.mp3    = "Scary Female Halloween Horror Laughter Vol 006" by alesiadavina (Pixabay id 165223)
                ตัดความเงียบท้ายและใส่ fade out
-nope.mp3     = wrong.mp3 (ไฟล์ถูกเปลี่ยนชื่อมา ไม่ทราบชื่อผู้สร้าง) ตัดช่วงเงียบด้านหน้าออก
+nope.mp3     = "Buzzer or Wrong Answer" by eritnhut1992 (Pixabay id 20582) ตัดช่วงเงียบด้านหน้าออก
 talisman.mp3 = "Holy Healing Spell" by Coghezzi ตัดช่วงเงียบหัวท้ายและใส่ fade out
