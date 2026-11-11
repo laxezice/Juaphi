@@ -395,7 +395,7 @@ body.shake #game, body.shake .reveal-card { animation: shake 0.5s linear; }
   position: fixed; inset: 0; overflow: hidden;
   background: radial-gradient(ellipse at 50% 42%, #4a86c4 0%, #2a5283 45%, #0f1a2c 100%);
 }
-.b2-seats { position: absolute; top: 92px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px; }
+.b2-seats { position: absolute; top: 92px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 4px; }
 .b2-seat {
   display: flex; align-items: center; padding: 0; border: none; border-radius: 999px;
   background: none; color: inherit; font: inherit; cursor: pointer;
@@ -464,3 +464,46 @@ body.shake #game, body.shake .reveal-card { animation: shake 0.5s linear; }
   .b2-seat { zoom: 1.25; }
   .b2-center { gap: 48px; }
 }
+
+/* ตัวเลือกห้อง "การ์ดเสริม" (ห้องรอ / กล่องจบเกม) */
+.toggle { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 10px 14px; text-align: left; cursor: pointer;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: var(--radius); }
+.toggle input { flex: none; width: 22px; height: 22px; accent-color: #e6b04d; cursor: pointer; }
+.toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.toggle-text small { color: #c9bda6; font-size: 12px; }
+.toggle.readonly { cursor: default; opacity: 0.85; }
+.toggle.readonly input { display: none; }
+.extra-tag { display: inline-block; padding: 0 7px; border-radius: 999px; background: #e6b04d; color: #2a1a00; font-size: 11px; font-weight: 600; vertical-align: middle; }
+
+/* การ์ดเสริมบนกระดาน 2D */
+.board2d::after { content: ''; position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+.board2d.blackout::after { animation: b2-blackout 1.4s ease-in-out; }
+@keyframes b2-blackout { 0% { opacity: 0; } 15%, 70% { opacity: 0.88; } 100% { opacity: 0; } }
+.b2-deck.fate { animation: b2-fate 0.9s ease-in-out; }
+@keyframes b2-fate { 0%, 100% { filter: none; transform: none; } 50% { filter: drop-shadow(0 0 16px #ff5a6e); transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .board2d.blackout::after, .b2-deck.fate { animation: none; } }
+
+/* ทิศการเล่น: วงลูกศรรอบกองกลาง กับลูกศรระหว่างที่นั่ง */
+.b2-orbit { position: absolute; left: 50%; top: calc((var(--seats-b, 200px) + 100% - var(--hand-h, 200px)) / 2); transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
+.b2-orbit-ring { fill: none; stroke: rgba(255, 213, 120, 0.4); stroke-width: 2.5; stroke-dasharray: 3 9; stroke-linecap: round; }
+.b2-orbit-arrow { fill: none; stroke: #ffd36b; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(255, 200, 80, 0.9)); }
+.b2-orbit.flash .b2-orbit-ring { animation: b2-orbit-flash 1.2s ease-out; }
+@keyframes b2-orbit-flash { 0% { stroke: #fff2c4; stroke-width: 6; } 100% { stroke: rgba(255, 213, 120, 0.22); stroke-width: 2; } }
+.b2-flow { align-self: center; font: 600 28px 'Mitr', sans-serif; line-height: 1; color: #ffd36b; text-shadow: 0 0 6px rgba(255, 200, 80, 0.8); animation: b2-flow 1.1s ease-in-out infinite; }
+.board2d.rev .b2-flow { animation-name: b2-flow-rev; }
+@keyframes b2-flow { 0%, 100% { transform: translateX(-2px); opacity: 0.55; } 50% { transform: translateX(3px); opacity: 1; } }
+@keyframes b2-flow-rev { 0%, 100% { transform: scaleX(-1) translateX(-2px); opacity: 0.55; } 50% { transform: scaleX(-1) translateX(3px); opacity: 1; } }
+.b2-pop-rev { font-size: 40px; color: #ffd36b; text-shadow: 0 0 14px rgba(255, 200, 80, 0.9), 0 3px 0 #000; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .b2-flow { animation: none; } .board2d.rev .b2-flow { transform: scaleX(-1); } }
+
+/* ป้ายจำนวนตาที่เหลือบนปุ่มจั่ว (โดนสาปส่ง) */
+.draw-turns {
+  position: absolute; top: -6px; right: -14px; z-index: 2; min-width: 54px; padding: 3px 8px 4px; display: flex; flex-direction: column; align-items: center;
+  background: linear-gradient(#e0473b, #9e1f1a); border: 2px solid #ffd9a0; border-radius: 14px; box-shadow: 0 0 12px rgba(255, 70, 50, 0.85), 0 3px 6px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); line-height: 1; pointer-events: none;
+}
+.draw-turns b { font: 600 26px/1 'Mitr', sans-serif; color: #fff; }
+.draw-turns small { margin-top: 2px; font: 600 11px/1 'Mitr', sans-serif; color: #ffe6c4; white-space: nowrap; }
+.draw-turns.bump { animation: draw-bump 0.5s ease-out; }
+@keyframes draw-bump { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .draw-turns.bump { animation: none; } }

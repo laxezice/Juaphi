@@ -439,6 +439,7 @@ export async function createScene(canvas, hooks) {
       case 'give':
       case 'steal':
       case 'demand':
+      case 'pass':   // ไฟดับ: การ์ดส่งต่อให้คนถัดไป
         if (e.empty || e.got === false) return;
         return fly(e.card && (e.to === you || e.from === you) ? e.card.kind : null, seatPos(e.from), seatPos(e.to), { ms: 650, height: 1 });
       case 'grudge': {

@@ -4,9 +4,12 @@
 
 const { buildDeck, shuffle } = require('./deck');
 
-/** @param {string[]} playerIds ตามลำดับที่นั่ง */
-function createGame(playerIds, rng) {
-  const { hands, deck } = buildDeck(playerIds.length, rng);
+/**
+ * @param {string[]} playerIds ตามลำดับที่นั่ง
+ * @param {{extras?: boolean}} [opts] extras = ใส่การ์ดเสริมลงกอง
+ */
+function createGame(playerIds, rng, { extras = false } = {}) {
+  const { hands, deck } = buildDeck(playerIds.length, rng, { extras });
   return {
     players: playerIds.map((id, i) => ({ id, hand: hands[i], alive: true, grudge: false })),
     deck,
@@ -14,6 +17,8 @@ function createGame(playerIds, rng) {
     current: playerIds[0],
     turnsLeft: 1,
     cursed: false,
+    dir: 1,          // ทิศการเล่น 1 = ตามที่นั่ง, -1 = ย้อนกลับ (การ์ดเดินถอยหลัง)
+    extras,
     pending: null,
     winner: null,
   };
@@ -24,11 +29,13 @@ const done = (events) => ({ ok: true, events });
 const find = (g, id) => g.players.find((p) => p.id === id);
 const alive = (g) => g.players.filter((p) => p.alive);
 
-/** คนที่ยังรอดคนถัดไปตามลำดับที่นั่ง */
+/** คนที่ยังรอดคนถัดไปตามทิศการเล่น */
 function nextAlive(g, fromId) {
   const i = g.players.findIndex((p) => p.id === fromId);
-  for (let k = 1; k <= g.players.length; k++) {
-    const p = g.players[(i + k) % g.players.length];
+  const n = g.players.length;
+  const dir = g.dir === -1 ? -1 : 1;
+  for (let k = 1; k <= n; k++) {
+    const p = g.players[(((i + dir * k) % n) + n) % n];
     if (p.alive) return p.id;
   }
   return null;
@@ -67,27 +74,36 @@ function kill(g, p) {
 function doDraw(g, me) {
   if (g.current !== me.id) return fail('ยังไม่ถึงตาคุณ');
   if (g.pending) return fail('รอให้เรื่องตรงหน้าจบก่อน');
-  const card = g.deck.shift();
   const events = [];
+  receive(g, me, g.deck.shift(), events);
+  return done(events);
+}
+
+/**
+ * คนจั่วได้การ์ดใบหนึ่ง (จากบนกอง ก้นกอง หรือจั่วแทนคนที่ถึงตาเพราะโดนผีเข้า)
+ * ตาที่จบคือตาของ g.current เสมอ extra = ข้อมูลเพิ่มใน event (เช่น bottom, for)
+ */
+function receive(g, me, card, events, extra = {}) {
   if (card.kind !== 'ghost') {
     me.hand.push(card);
-    events.push({ type: 'draw', player: me.id, secret: { to: [me.id], card } });
+    events.push({ type: 'draw', player: me.id, ...extra, secret: { to: [me.id], card } });
     endTurn(g);
-    return done(events);
+    return;
   }
   const ti = me.hand.findIndex((c) => c.kind === 'talisman');
   if (ti >= 0) {
     g.discard.push(me.hand.splice(ti, 1)[0]);
     g.pending = { kind: 'insert', player: me.id, ghost: card };
-    events.push({ type: 'ghost', player: me.id, saved: true });
-    return done(events);
+    events.push({ type: 'ghost', player: me.id, saved: true, ...extra });
+    return;
   }
   kill(g, me);
   g.discard.push(card);
-  events.push({ type: 'ghost', player: me.id, saved: false });
+  events.push({ type: 'ghost', player: me.id, saved: false, ...extra });
   checkWinner(g, events);
-  if (!g.winner) passTurn(g, nextAlive(g, me.id), 1, false);
-  return done(events);
+  if (g.winner) return;
+  if (g.current === me.id) passTurn(g, nextAlive(g, me.id), 1, false);
+  else endTurn(g);   // คนที่โดนผีเข้าตาย ตาของคนที่ถึงตาจบไปหนึ่งตา
 }
 
 function doInsert(g, me, index) {
@@ -100,9 +116,12 @@ function doInsert(g, me, index) {
   return done([{ type: 'insert', player: me.id }]);
 }
 
-const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg']);
+const EXTRAS = new Set(['blackout', 'possess', 'grave', 'fate', 'reverse', 'bottom']);
+const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', ...EXTRAS]);
 const IMPS = new Set(['imp1', 'imp2', 'imp3', 'imp4', 'imp5']);
 const ALL_KINDS = new Set(['ghost', 'talisman', 'nope', ...SINGLE, ...IMPS]);
+/** การ์ดในกองทิ้งที่ "ขุดหลุมศพ" หยิบได้: ไม่ใช่ผี และไม่ใช่ขุดหลุมศพด้วยกัน (กันวนไม่จบ) */
+const diggable = (g) => g.discard.filter((c) => c.kind !== 'ghost' && c.kind !== 'grave');
 const randomIndex = (n, rng) => Math.floor(rng() * n);
 
 /** ตรวจว่าการ์ดชุดนี้เล่นได้ไหม คืนข้อความผิดพลาด หรือ null ถ้าเล่นได้ */
@@ -115,6 +134,12 @@ function checkPlay(g, me, cards, target, name) {
     if (!t.hand.length) return 'คนนี้ไม่มีการ์ดในมือ';
     return null;
   };
+  if (cards.length === 1 && k === 'possess') {
+    const t = find(g, target);
+    if (!t || t.id === me.id) return 'เลือกคนที่จะให้ผีเข้า';
+    if (!t.alive) return 'คนนี้ตกรอบไปแล้ว';
+    return null;
+  }
   if (cards.length === 1 && SINGLE.has(k)) return k === 'beg' ? needTarget() : null;
   if (IMPS.has(k) && (cards.length === 2 || cards.length === 3) && cards.every((c) => c.kind === k)) {
     if (cards.length === 3 && !ALL_KINDS.has(name)) return 'ระบุชื่อการ์ดที่ต้องการ';
@@ -190,6 +215,32 @@ function resolvePending(g, rng) {
   } else if (k === 'wind') {
     shuffle(g.deck, rng);
     events.push({ type: 'wind', player: actor.id });
+  } else if (k === 'reverse') {
+    g.dir = g.dir === -1 ? 1 : -1;
+    events.push({ type: 'reverse', player: actor.id, dir: g.dir });
+    endTurn(g);
+  } else if (k === 'bottom') {
+    receive(g, actor, g.deck.pop(), events, { bottom: true });
+  } else if (k === 'possess') {
+    const t = find(g, target);
+    if (!t || !t.alive) events.push({ type: 'possess', from: actor.id, to: target, empty: true });
+    else {
+      events.push({ type: 'possess', from: actor.id, to: t.id });
+      receive(g, t, g.deck.shift(), events, { for: actor.id });
+    }
+  } else if (k === 'blackout') {
+    // สุ่มทุกคนก่อน แล้วค่อยส่งพร้อมกัน (ใบที่ได้รับไม่ถูกส่งต่ออีกทอด)
+    events.push({ type: 'blackout', player: actor.id });
+    const moves = alive(g).filter((p) => p.hand.length)
+      .map((p) => ({ from: p, to: find(g, nextAlive(g, p.id)), card: p.hand[randomIndex(p.hand.length, rng)] }));
+    for (const m of moves) if (m.to && m.to !== m.from) moveCard(m.from, m.to, m.card);
+    for (const m of moves) if (m.to && m.to !== m.from) events.push({ type: 'pass', from: m.from.id, to: m.to.id, secret: { to: [m.from.id, m.to.id], card: m.card } });
+  } else if (k === 'grave') {
+    if (!diggable(g).length) events.push({ type: 'dig', player: actor.id, empty: true });
+    else g.pending = { kind: 'dig', player: actor.id };
+  } else if (k === 'fate') {
+    const n = Math.min(3, g.deck.length);
+    if (n) g.pending = { kind: 'fate', player: actor.id, n };
   } else {
     const t = find(g, target);
     if (k === 'beg') {
@@ -209,6 +260,31 @@ function resolvePending(g, rng) {
     }
   }
   return done(events);
+}
+
+/** ขุดหลุมศพ: หยิบการ์ดจากกองทิ้งขึ้นมือ (การ์ดในกองทิ้งทุกคนเห็นอยู่แล้ว ใบที่หยิบจึงไม่ใช่ความลับ) */
+function doDig(g, me, uid) {
+  const pd = g.pending;
+  if (!pd || pd.kind !== 'dig' || pd.player !== me.id) return fail('ตอนนี้ไม่ได้ขุดหลุมศพ');
+  const card = diggable(g).find((c) => c.uid === uid);
+  if (!card) return fail('เลือกการ์ดจากกองทิ้ง (ยกเว้นผี)');
+  g.discard.splice(g.discard.indexOf(card), 1);
+  me.hand.push(card);
+  g.pending = null;
+  return done([{ type: 'dig', player: me.id, card }]);
+}
+
+/** ผูกดวง: order = uid ของการ์ดบนกองตามลำดับใหม่ (ใบแรก = บนสุด) */
+function doFate(g, me, order) {
+  const pd = g.pending;
+  if (!pd || pd.kind !== 'fate' || pd.player !== me.id) return fail('ตอนนี้ไม่ได้ผูกดวง');
+  const top = g.deck.slice(0, pd.n);
+  if (!Array.isArray(order) || order.length !== top.length || new Set(order).size !== top.length) return fail('เรียงการ์ดให้ครบทุกใบ');
+  const cards = order.map((u) => top.find((c) => c.uid === u));
+  if (cards.some((c) => !c)) return fail('เรียงการ์ดให้ครบทุกใบ');
+  g.deck.splice(0, top.length, ...cards);
+  g.pending = null;
+  return done([{ type: 'fate', player: me.id, n: top.length }]);
 }
 
 function doGrudge(g, me, targetId, rng) {
@@ -231,6 +307,7 @@ function waitingOn(g) {
   if (!pd) return g.current;
   if (pd.kind === 'insert') return pd.player;
   if (pd.kind === 'give') return pd.from;
+  if (pd.kind === 'dig' || pd.kind === 'fate') return pd.player;
   return null;
 }
 
@@ -242,6 +319,8 @@ function autoAct(g, rng) {
   const pd = g.pending;
   if (pd && pd.kind === 'insert') return doInsert(g, me, randomIndex(g.deck.length + 1, rng));
   if (pd && pd.kind === 'give') return doGive(g, me, me.hand[randomIndex(me.hand.length, rng)].uid);
+  if (pd && pd.kind === 'dig') { const c = diggable(g); return doDig(g, me, c[randomIndex(c.length, rng)].uid); }
+  if (pd && pd.kind === 'fate') return doFate(g, me, g.deck.slice(0, pd.n).map((c) => c.uid));
   return doDraw(g, me);
 }
 
@@ -262,6 +341,8 @@ function removePlayer(g, id, rng) {
     g.pending = null;
   } else if (pd && pd.kind === 'insert' && pd.player === id) {
     g.deck.splice(randomIndex(g.deck.length + 1, rng), 0, pd.ghost);
+    g.pending = null;
+  } else if (pd && (pd.kind === 'dig' || pd.kind === 'fate') && pd.player === id) {
     g.pending = null;
   }
   g.discard.push(...p.hand);
@@ -298,9 +379,13 @@ function act(g, playerId, action, rng) {
       return doGive(g, me, action.uid);
     case 'grudge':
       return doGrudge(g, me, action.target, rng);
+    case 'dig':
+      return doDig(g, me, action.uid);
+    case 'fate':
+      return doFate(g, me, action.order);
     default:
       return fail('คำสั่งไม่ถูกต้อง');
   }
 }
 
-module.exports = { createGame, act, resolvePending, removePlayer, waitingOn, autoAct, nextAlive, ALL_KINDS };
+module.exports = { createGame, act, resolvePending, removePlayer, waitingOn, autoAct, nextAlive, diggable, ALL_KINDS, EXTRAS };

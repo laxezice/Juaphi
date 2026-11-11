@@ -1,6 +1,6 @@
 // หน้าจอทั้งหมดที่เป็น HTML: หน้าแรก ห้องรอ ปุ่มในเกม กล่องเลือก และบันทึกเหตุการณ์
 import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
-import { CARD_INFO, KIND_ORDER, describeSelection, deckCount } from './cards.js';
+import { CARD_INFO, KIND_ORDER, EXTRA_KINDS, kindsFor, describeSelection, deckCount } from './cards.js';
 import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
 import * as sound from './sound.js';
 import { revealGhost } from './reveal.js';
@@ -49,7 +49,18 @@ export function describe(e, you, nameOf) {
   const n = nameOf;
   switch (e.type) {
     case 'start': return 'เริ่มเกม! ระวังผีในกอง';
-    case 'draw': return e.player === you && e.card ? `คุณจั่วได้ ${cardName(e.card.kind)}` : `${n(e.player)} จั่วการ์ด`;
+    case 'draw': {
+      const how = e.for ? `โดนผีเข้า จั่วแทน ${n(e.for)}` : e.bottom ? 'จั่วก้นกอง' : 'จั่ว';
+      return e.player === you && e.card ? `คุณ${how}ได้ ${cardName(e.card.kind)}` : `${n(e.player)} ${how}การ์ด`;
+    }
+    case 'possess': return e.empty ? null : `${n(e.from)} ทำให้ผีเข้า ${n(e.to)}!`;
+    case 'blackout': return 'ไฟดับ! ทุกคนส่งการ์ดสุ่มให้คนถัดไป';
+    case 'pass':
+      if (!e.card) return null;
+      return e.to === you ? `ในความมืด คุณได้ ${cardName(e.card.kind)} จาก ${n(e.from)}` : `ในความมืด คุณเสีย ${cardName(e.card.kind)} ให้ ${n(e.to)}`;
+    case 'dig': return e.empty ? 'กองทิ้งไม่มีอะไรให้ขุด' : `${n(e.player)} ขุด ${cardName(e.card.kind)} ขึ้นจากหลุมศพ`;
+    case 'fate': return `${n(e.player)} ผูกดวงการ์ด ${e.n} ใบบนกอง`;
+    case 'reverse': return 'เดินถอยหลัง! ลำดับการเล่นกลับทิศ';
     case 'ghost': return e.saved ? `${n(e.player)} จั่วได้ผี! แต่มียันต์ปัดเป่าไว้` : `${n(e.player)} โดนผีหลอก ตกรอบ!`;
     case 'insert': return `${n(e.player)} แอบเสียบผีกลับเข้ากอง`;
     case 'play': {
@@ -126,9 +137,10 @@ function chip(label, onClick) {
   return b;
 }
 
-function pickTarget(title) {
+/** needCards: ต้องมีการ์ดในมือถึงเลือกได้ (ผีเข้าเลือกคนมือว่างได้) */
+function pickTarget(title, { needCards = true } = {}) {
   const g = G();
-  const ids = g.players.filter((p) => p.alive && p.handCount > 0 && p.id !== S().you).map((p) => p.id);
+  const ids = g.players.filter((p) => p.alive && (!needCards || p.handCount > 0) && p.id !== S().you).map((p) => p.id);
   if (!ids.length) { toast('ไม่มีใครมีการ์ดให้เลือก'); return Promise.resolve(null); }
   const pr = openModal('target', title, (body, done) => {
     for (const id of ids) {
@@ -145,7 +157,7 @@ function pickName(target) {
     key: 'name',
     title: 'ทวงการ์ดอะไร?',
     detail: `ถ้า ${nameOf(target)} มีการ์ดใบนี้ ต้องยกให้คุณ ถ้าไม่มีก็ไม่ได้อะไร`,
-    cards: KIND_ORDER.map((k) => ({ kind: k, key: k })),
+    cards: kindsFor(G() && G().extras).map((k) => ({ kind: k, key: k })),
     confirm: (c) => `ทวง ${cardName(c.kind)}`,
   });
 }
@@ -176,7 +188,9 @@ async function playSelected() {
   if (!sel.ok) return toast(sel.label);
   const action = { type: 'play', uids: cards.map((c) => c.uid) };
   if (sel.needTarget) {
-    action.target = await pickTarget(cards.length > 1 ? 'ขโมยการ์ดจากใคร?' : 'ขอการ์ดจากใคร?');
+    const possess = cards[0].kind === 'possess';
+    const title = possess ? 'ให้ผีเข้าใคร? (เขาจั่วแทนคุณ)' : cards.length > 1 ? 'ขโมยการ์ดจากใคร?' : 'ขอการ์ดจากใคร?';
+    action.target = await pickTarget(title, { needCards: !possess });
     if (!action.target) return;
   }
   if (sel.needName) {
@@ -231,6 +245,51 @@ function openGive(g) {
   }).then((uid) => { if (uid) act({ type: 'give', uid }); });
 }
 
+/** ขุดหลุมศพ: เลือกการ์ดจากกองทิ้ง (ใบล่าสุดอยู่ซ้าย) */
+function openDig(g) {
+  const cards = [...g.me.dig].reverse();
+  openTray({
+    key: 'dig',
+    tagText: 'ขุดหลุมศพ',
+    title: 'หยิบการ์ดจากกองทิ้ง 1 ใบ',
+    detail: 'ซ้ายสุดคือใบที่เพิ่งทิ้งล่าสุด (ผีขุดไม่ได้)',
+    cards: cards.map((c) => ({ kind: c.kind, key: c.uid })),
+    confirm: (c) => `หยิบ ${cardName(c.kind)}`,
+    cancel: null,
+  }).then((uid) => { if (uid) act({ type: 'dig', uid }); });
+}
+
+/** ผูกดวง: เลือกทีละใบว่าใบไหนอยู่บนสุด ใบถัดไป ... ใบสุดท้ายเหลือใบเดียวก็อยู่ล่าง */
+let fateBusy = false;
+async function openFate(g) {
+  fateBusy = true;
+  const top = g.me.fate;
+  const label = (c) => `เดิมใบที่ ${top.indexOf(c) + 1}`;
+  const order = [];
+  let left = [...top];
+  try {
+    while (left.length > 1) {
+      const i = order.length;
+      const uid = await openTray({
+        key: 'fate',
+        tagText: 'ผูกดวง',
+        title: i === 0 ? 'เลือกใบที่จะให้อยู่บนสุด' : `เลือกใบที่ ${i + 1} จากบน`,
+        detail: `${top.length} ใบบนกอง เห็นแค่คุณคนเดียว · เรียงแล้ว: ${order.length ? order.map((c) => cardName(c.kind)).join(' → ') : '-'}`,
+        cards: left.map((c) => ({ kind: c.kind, key: c.uid, tag: label(c) })),
+        confirm: (c) => `ให้ ${cardName(c.kind)} เป็นใบที่ ${i + 1}`,
+        cancel: null,
+      });
+      if (!uid) return;   // แถวถูกปิดเพราะสถานการณ์เปลี่ยน
+      order.push(left.find((c) => c.uid === uid));
+      left = left.filter((c) => c.uid !== uid);
+    }
+    order.push(...left);
+    act({ type: 'fate', order: order.map((c) => c.uid) });
+  } finally {
+    fateBusy = false;
+  }
+}
+
 async function doGrudge() {
   const target = await pickTarget('อาฆาตใคร? (สุ่มทิ้งการ์ดเขา 1 ใบ ใช้ได้ครั้งเดียว)');
   if (target) act({ type: 'grudge', target });
@@ -251,7 +310,7 @@ function renderHome() {
   for (const r of net.rooms) {
     const li = document.createElement('li');
     const full = r.players >= r.max;
-    li.innerHTML = `<div><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}</div></div>
+    li.innerHTML = `<div><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}${r.extras ? ' · <span class="extra-tag">+การ์ดเสริม</span>' : ''}</div></div>
       <span class="badge ${r.status}">${r.status === 'play' ? (full ? 'เต็ม' : 'กำลังเล่น · เข้าไปดู') : full ? 'เต็ม' : 'รอคน · เข้าร่วม'}</span>`;
     li.onclick = () => {
       if (!ensureName()) return;
@@ -287,11 +346,22 @@ function renderLobby(s) {
   $('add-bot').hidden = !isHost;
   $('add-bot').disabled = full;
   $('add-bot').textContent = full ? `ห้องเต็มแล้ว (${MAX_SEATS} ที่)` : 'เพิ่มบอต';
+  renderExtras(s, 'extras');
   $('start').hidden = !isHost;
   $('start').disabled = s.room.players.length < 2;
   $('lobby-hint').textContent = isHost
     ? (s.room.players.length < 2 ? 'รอเพื่อนอย่างน้อยอีก 1 คน หรือเพิ่มบอตมาเล่นด้วย' : `พร้อมแล้ว ${s.room.players.length} คน`)
     : 'รอหัวห้องกดเริ่มเกม';
+}
+
+/** สวิตช์ "การ์ดเสริม" (ห้องรอ / กล่องจบเกม): หัวห้องกดได้ คนอื่นเห็นสถานะ */
+function renderExtras(s, id) {
+  const box = $(id);
+  const isHost = s.room.hostId === s.you;
+  box.querySelector('input').checked = !!s.room.extras;
+  box.querySelector('input').disabled = !isHost;
+  box.classList.toggle('readonly', !isHost);
+  box.hidden = !isHost && !s.room.extras;
 }
 
 function renderHand(g) {
@@ -318,9 +388,11 @@ let chainTimer = null;
 function curseStack(g, actor, kind) {
   if (!g || (kind !== 'curse' && kind !== 'curse2')) return null;
   const i = g.players.findIndex((p) => p.id === actor);
+  const n = g.players.length;
+  const dir = g.dir === -1 ? -1 : 1;
   let next = null;
-  for (let k = 1; k <= g.players.length && !next; k++) {
-    const p = g.players[(i + k) % g.players.length];
+  for (let k = 1; k <= n && !next; k++) {
+    const p = g.players[(((i + dir * k) % n) + n) % n];
     if (p.alive && p.id !== actor) next = p.id;
   }
   const owed = g.current === actor && g.cursed ? g.turnsLeft : 0;
@@ -412,13 +484,27 @@ function renderGame(s) {
   const turn = $('turn');
   turn.classList.toggle('mine', !!mine);
   turn.textContent = g.winner ? 'จบเกม'
-    : `${g.current === you ? 'ตาของคุณ' : `ตาของ ${nameOf(g.current)}`}${g.turnsLeft > 1 ? ` · ต้องเล่นอีก ${g.turnsLeft} ตา` : ''} · กอง ${g.deckCount} ใบ`;
+    : `${g.current === you ? 'ตาของคุณ' : `ตาของ ${nameOf(g.current)}`}${g.turnsLeft > 1 ? ` · ต้องเล่นอีก ${g.turnsLeft} ตา` : ''} · กอง ${g.deckCount} ใบ${g.dir === -1 ? ' · ↺' : ''}`;
+  turn.title = g.dir === -1 ? 'ลำดับการเล่นกลับทิศอยู่ (เดินถอยหลัง)' : '';
 
   // ปุ่ม
   const canNope = me && me.alive && pd && pd.kind === 'window' && me.hand.some((c) => c.kind === 'nope');
   $('nope').hidden = !canNope;
   const idle = mine && !pd && !g.winner;
   $('draw').hidden = !idle;
+  // โดนสาปเล่นหลายตา: ป้ายบนปุ่มจั่วบอกว่าต้องจั่วอีกกี่ครั้ง (นับครั้งนี้ด้วย)
+  const dt = $('draw-turns');
+  const many = idle && g.turnsLeft > 1;
+  dt.hidden = !many;
+  if (many && dt.dataset.n !== String(g.turnsLeft)) {
+    dt.dataset.n = String(g.turnsLeft);
+    dt.innerHTML = `<b>×${g.turnsLeft}</b><small>อีก ${g.turnsLeft} ตา</small>`;
+    dt.classList.remove('bump');
+    dt.getBoundingClientRect();
+    dt.classList.add('bump');
+  }
+  if (!many) dt.dataset.n = '';
+  $('draw').setAttribute('aria-label', many ? `จั่ว (ต้องเล่นอีก ${g.turnsLeft} ตา)` : 'จั่ว');
   const sel = describeSelection(handCards().filter((c) => selected.has(c.uid)));
   $('play').hidden = !idle || selected.size === 0;
   $('play').textContent = sel.label;
@@ -458,6 +544,8 @@ function renderGame(s) {
     prompt = `${what}${pd.nopeCount ? ` · โดน "ไม่!" ${pd.nopeCount} ครั้ง` : ''}${canNope ? ' — กด ไม่! เพื่อยกเลิก' : ''}`;
   } else if (pd && pd.kind === 'insert') prompt = pd.player === you ? 'เลือกตำแหน่งเสียบผีกลับเข้ากอง' : `${nameOf(pd.player)} กำลังเลือกที่ซ่อนผี…`;
   else if (pd && pd.kind === 'give') prompt = pd.from === you ? 'เลือกการ์ดที่จะให้' : `${nameOf(pd.from)} กำลังเลือกการ์ดให้ ${nameOf(pd.to)}`;
+  else if (pd && pd.kind === 'dig') prompt = pd.player === you ? 'เลือกการ์ดจากกองทิ้ง' : `${nameOf(pd.player)} กำลังขุดหลุมศพ…`;
+  else if (pd && pd.kind === 'fate') prompt = pd.player === you ? 'เรียงการ์ดบนกองใหม่' : `${nameOf(pd.player)} กำลังผูกดวงการ์ดบนกอง…`;
   else if (!me) prompt = 'คุณกำลังดูอยู่ ได้เล่นเกมถัดไป';
   else if (!me.alive) prompt = me.grudge ? 'คุณเป็นวิญญาณแล้ว ใช้อาฆาตได้ 1 ครั้งเมื่อไหร่ก็ได้' : 'คุณเป็นวิญญาณแล้ว ดูเพื่อนเล่นต่อ';
   else if (mine) prompt = selected.size ? '' : 'เล่นการ์ดกี่ใบก็ได้ แล้วกด จั่ว เพื่อจบตา';
@@ -469,6 +557,10 @@ function renderGame(s) {
   else if (modalKey === 'insert') closeModal();
   if (pd && pd.kind === 'give' && pd.from === you) { if (trayKey() !== 'give') openGive(g); }
   else if (trayKey() === 'give') closeTray();
+  if (pd && pd.kind === 'dig' && pd.player === you && me.dig) { if (trayKey() !== 'dig') openDig(g); }
+  else if (trayKey() === 'dig') closeTray();
+  if (pd && pd.kind === 'fate' && pd.player === you && me.fate) { if (!fateBusy) openFate(g); }
+  else if (trayKey() === 'fate') closeTray();
   // ทวงการ์ดค้างอยู่แต่มีเรื่องแทรกหรือหมดตา ปิดแถว
   if (trayKey() === 'name' && (pd || g.winner || !mine)) closeTray();
   // กำลังเลือกเป้าหมายอยู่แต่สถานการณ์เปลี่ยน (มีเรื่องแทรก หรือหมดตาเรา) ปิดกล่อง
@@ -486,6 +578,7 @@ function renderGame(s) {
     $('again-bot').hidden = !isHost || s.room.players.length >= MAX_SEATS;
     $('again-hint').textContent = !isHost ? 'รอหัวห้องเริ่มรอบใหม่'
       : online < 2 ? 'เหลือคุณคนเดียว เพิ่มบอตหรือชวนเพื่อนเข้าห้องก่อนเริ่มรอบใหม่' : '';
+    renderExtras(s, 'again-extras');
   }
 
   // รายชื่อในเมนู
@@ -515,6 +608,11 @@ export function render() {
 }
 
 // ---------- แผงดูการ์ดและคอมโบ ----------
+/** เกมนี้ (หรือเกมถัดไปในห้องรอ) มีการ์ดเสริมไหม */
+const extrasOn = () => {
+  const s = S();
+  return !!(s && (s.game ? s.game.extras : s.room.extras));
+};
 const seatCount = () => {
   const s = S();
   return s ? (s.game ? s.game.players.length : s.room.players.length) : 4;
@@ -523,16 +621,17 @@ const seatCount = () => {
 function openCardList() {
   const n = Math.max(2, seatCount());
   const hand = handCards();
-  openPanel(`การ์ดทั้งหมด (เกม ${n} คน)`, (body) => {
+  const extras = extrasOn();
+  openPanel(`การ์ดทั้งหมด (เกม ${n} คน${extras ? ' · มีการ์ดเสริม' : ''})`, (body) => {
     const grid = document.createElement('div');
     grid.className = 'card-grid';
-    for (const k of KIND_ORDER) {
+    for (const k of kindsFor(extras)) {
       const item = document.createElement('div');
       item.className = 'card-item';
       const mine = hand.filter((c) => c.kind === k).length;
       const info = document.createElement('div');
       info.className = 'card-info';
-      info.innerHTML = `<b>${esc(cardName(k))}</b><span>${esc(CARD_INFO[k].text)}</span>`
+      info.innerHTML = `<b>${esc(cardName(k))}${CARD_INFO[k].extra ? ' <span class="extra-tag">เสริม</span>' : ''}</b><span>${esc(CARD_INFO[k].text)}</span>`
         + `<small>ในเกม ${deckCount(k, n)} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
       item.append(cardEl(k), info);
       grid.append(item);
@@ -579,6 +678,12 @@ function openCombos() {
       comboRow(['curse', 'curse2'], 'สาปส่งต่อ', 'โดนสาปแล้วสาปต่อ ตาที่ค้างทั้งหมดทบไปให้คนถัดไป บวกอีก 2 หรือ 3 ตา'),
       comboRow(['mirror', 'sneak'], 'เคล็ดลับ: ส่องกระจกแล้วหนี', 'ส่องเห็นผีอยู่บนสุด ใช้ย่องหนีหรือสาปส่งจบตาโดยไม่ต้องจั่ว'),
       comboRow(['mirror', 'wind'], 'เคล็ดลับ: ส่องกระจกแล้วสับ', 'เห็นผีบนกองแต่ไม่มีทางหนี ใช้ลมพัดสับกองเสี่ยงดวงใหม่'),
+    );
+    if (extrasOn()) body.append(
+      comboRow(['fate', 'possess'], 'เคล็ดลับ: ผูกดวงแล้วผีเข้า', 'จัดผีไว้บนสุด แล้วให้ผีเข้าคนที่ไม่มียันต์ จั่วแทนคุณ'),
+      comboRow(['mirror', 'bottom'], 'เคล็ดลับ: ส่องกระจกแล้วจั่วก้นกอง', 'เห็นผีอยู่บนสุด จั่วใบล่างแทน ผียังรอคนถัดไปอยู่'),
+      comboRow(['curse', 'reverse'], 'เคล็ดลับ: สาปส่งหลังเดินถอยหลัง', 'กลับทิศก่อน คำสาปจะไปโดนคนอีกฝั่งแทน'),
+      comboRow(['grave', 'talisman'], 'เคล็ดลับ: ขุดยันต์คืน', 'ยันต์ที่ใช้ไปแล้วอยู่ในกองทิ้ง ขุดกลับมาไว้กันผีได้อีกครั้ง'),
     );
   });
 }
@@ -634,7 +739,9 @@ function soundFor(e) {
     case 'nope': sound.play('nope'); break;
     case 'draw': sound.play('draw'); break;
     case 'wind': sound.play('shuffle'); break;
-    case 'insert': case 'grudge': sound.play('card'); break;
+    case 'insert': case 'grudge': case 'reverse': case 'fate': case 'possess': sound.play('card'); break;
+    case 'blackout': sound.play('shuffle'); break;
+    case 'dig': if (!e.empty) sound.play('card'); break;
     case 'give': case 'steal': if (!e.empty) sound.play('card'); break;
     case 'demand': if (e.got) sound.play('card'); break;
     default:
@@ -690,6 +797,7 @@ export function initUI() {
   $('add-bot').onclick = () => send({ t: 'addBot' });
   $('again').onclick = () => send({ t: 'start' });
   $('again-bot').onclick = () => send({ t: 'addBot' });
+  for (const id of ['extras', 'again-extras']) $(id).querySelector('input').onchange = (e) => send({ t: 'options', extras: e.target.checked });
   $('draw').onclick = () => { selected.clear(); act({ type: 'draw' }); };
   $('play').onclick = () => playSelected();
   $('nope').onclick = () => {

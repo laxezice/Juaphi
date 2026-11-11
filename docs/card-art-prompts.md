@@ -87,3 +87,35 @@ Painterly digital illustration for a party card game, Thai haunted house folklor
 ```
 Painterly digital illustration for a party card game, Thai haunted house folklore theme, cute and playful spooky (chibi proportions, not scary). Subject: a gentle small female banana-tree spirit (nang tani) in a green traditional Thai sabai dress, peeking shyly from behind a large banana leaf, holding a banana bunch, soft green moonlit glow among banana trees at night. Main color accent: fresh leaf green with pale moonlight. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
 ```
+
+## การ์ดเสริม (เปิดในห้องด้วยตัวเลือก "การ์ดเสริม")
+
+### `blackout` ไฟดับ → `public/cards/blackout.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a dark room in an old Thai wooden house the instant a candle goes out, a thin curl of smoke rising from the wick, several hands reaching in from the edges of the darkness and swapping playing cards with each other, only wide startled eyes visible. Main color accent: deep violet darkness with a faint smoke-grey glow. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```
+
+### `possess` ผีเข้า → `public/cards/possess.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a villager sitting stiffly with eyes rolled up and hair standing on end while a translucent green spirit swirls into his body, his hand drawing a card from a deck as if pulled by strings. Main color accent: eerie spirit green. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```
+
+### `grave` ขุดหลุมศพ → `public/cards/grave.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a nervous little gravedigger with a hoe digging up a mound of earth under a big old tree at night, old weathered cards poking out of the soil, fireflies floating around. Main color accent: earthy brown with firefly yellow. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```
+
+### `fate` ผูกดวง → `public/cards/fate.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: an old Thai fortune teller tying a red sacred thread that links three floating cards in a row, incense sticks smoking and a yantra cloth behind her. Main color accent: sacred-thread red with incense gold. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```
+
+### `reverse` เดินถอยหลัง → `public/cards/reverse.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a timid character tiptoeing backwards out of the doorway of a haunted house, a swirling curved arrow of mist looping back the other way, nervous expression. Main color accent: cool moonlit blue. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```
+
+### `bottom` จั่วก้นกอง → `public/cards/bottom.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a sneaky hand slipping the very bottom card out from under a tall stack of cards, while a small ghost lies in wait curled on top of the stack, unaware. Main color accent: mischievous purple. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```

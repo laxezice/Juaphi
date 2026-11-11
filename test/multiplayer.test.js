@@ -98,6 +98,24 @@ test('only the host can add a bot; bots are marked and can be kicked', async (t)
   await waitFor(() => a.state.room.players.length === 3);
 });
 
+test('the host turns on extra cards; it shows in the room list and the next game', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  b.send({ t: 'options', extras: true });
+  await waitFor(() => b.errors.length === 1);
+  assert.equal(a.state.room.extras, false);
+  const watcher = await srv.client('W');
+  a.send({ t: 'options', extras: true });
+  await waitFor(() => a.state.room.extras === true && b.state.room.extras === true);
+  await waitFor(() => watcher.rooms && watcher.rooms.some((r) => r.code === a.room && r.extras));
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  assert.equal(a.state.game.extras, true);
+  a.send({ t: 'options', extras: false });
+  await waitFor(() => a.errors.length === 1);   // เปลี่ยนกลางเกมไม่ได้
+  assert.equal(a.state.room.extras, true);
+});
+
 test('kicking every bot mid-game ends it; the lone host can add a bot and start again', async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
   const [a] = await setupRoom(srv, ['A']);

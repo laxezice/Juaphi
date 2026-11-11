@@ -18,6 +18,15 @@ const DECK_TABLE = {
   imp4: [4, 8],
   imp5: [4, 8],
 };
+// การ์ดเสริม: ใส่เพิ่มเมื่อหัวห้องเปิดตัวเลือก "การ์ดเสริม"
+const EXTRA_TABLE = {
+  blackout: [2, 4],  // ไฟดับ
+  possess: [2, 4],   // ผีเข้า
+  grave: [2, 4],     // ขุดหลุมศพ
+  fate: [2, 4],      // ผูกดวง
+  reverse: [2, 4],   // เดินถอยหลัง
+  bottom: [2, 4],    // จั่วก้นกอง
+};
 const SPARE_TALISMANS = [2, 3];
 
 /** ตัวสุ่มที่กำหนดผลได้ (mulberry32) ใช้ในเทสต์ */
@@ -46,12 +55,13 @@ function shuffle(arr, rng) {
  * แล้วค่อยใส่ผี (จำนวนคน - 1) กับยันต์สำรองลงกองแล้วสับ
  * @returns {{ hands: {uid:string,kind:string}[][], deck: {uid:string,kind:string}[] }}
  */
-function buildDeck(playerCount, rng) {
+function buildDeck(playerCount, rng, { extras = false } = {}) {
   const col = playerCount >= 6 ? 1 : 0;
   let n = 0;
   const card = (kind) => ({ uid: 'c' + (++n), kind });
   const pool = [];
-  for (const [kind, counts] of Object.entries(DECK_TABLE)) {
+  const table = extras ? { ...DECK_TABLE, ...EXTRA_TABLE } : DECK_TABLE;
+  for (const [kind, counts] of Object.entries(table)) {
     for (let i = 0; i < counts[col]; i++) pool.push(card(kind));
   }
   shuffle(pool, rng);
@@ -65,4 +75,4 @@ function buildDeck(playerCount, rng) {
   return { hands, deck: pool };
 }
 
-module.exports = { HAND_SIZE, DECK_TABLE, SPARE_TALISMANS, makeRng, shuffle, buildDeck };
+module.exports = { HAND_SIZE, DECK_TABLE, EXTRA_TABLE, SPARE_TALISMANS, makeRng, shuffle, buildDeck };

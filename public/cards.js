@@ -9,6 +9,13 @@ export const CARD_INFO = {
   mirror: { name: 'ส่องกระจก', text: 'แอบดูการ์ด 3 ใบบนกอง', color: '#3f8f7a' },
   wind: { name: 'ลมพัด', text: 'สับกองจั่ว', color: '#4d7f9e' },
   beg: { name: 'ขอของ', text: 'เลือกเพื่อน ให้เขายกการ์ดให้ 1 ใบ', color: '#a0613f' },
+  // การ์ดเสริม (extra: มีเฉพาะห้องที่เปิดตัวเลือก "การ์ดเสริม")
+  blackout: { name: 'ไฟดับ', extra: true, text: 'ทุกคนส่งการ์ดสุ่ม 1 ใบให้คนถัดไป', color: '#4a4466' },
+  possess: { name: 'ผีเข้า', extra: true, text: 'เลือกคนให้จั่วแทนคุณ แล้วจบตา', color: '#2f7a5a' },
+  grave: { name: 'ขุดหลุมศพ', extra: true, text: 'หยิบการ์ดจากกองทิ้งขึ้นมือ 1 ใบ', color: '#6f5d38' },
+  fate: { name: 'ผูกดวง', extra: true, text: 'ดู 3 ใบบนกอง แล้วเรียงใหม่', color: '#a03a4a' },
+  reverse: { name: 'เดินถอยหลัง', extra: true, text: 'กลับทิศการเล่น แล้วจบตาไม่ต้องจั่ว', color: '#3a6aa0' },
+  bottom: { name: 'จั่วก้นกอง', extra: true, text: 'จั่วใบล่างสุดของกอง แล้วจบตา', color: '#7a4a8a' },
   imp1: { name: 'กุมารทอง', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#9c7a1c' },
   imp2: { name: 'กระสือ', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#5a7f9c' },
   imp3: { name: 'กระหัง', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#8a7a4a' },
@@ -17,11 +24,16 @@ export const CARD_INFO = {
 };
 
 export const KIND_ORDER = Object.keys(CARD_INFO);
+export const EXTRA_KINDS = KIND_ORDER.filter((k) => CARD_INFO[k].extra);
+/** การ์ดที่มีในเกมนี้ (ไม่มีการ์ดเสริมถ้าห้องไม่ได้เปิด) */
+export const kindsFor = (extras) => KIND_ORDER.filter((k) => extras || !CARD_INFO[k].extra);
 
 // จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
 const DECK = {
   nope: [5, 10], sneak: [4, 8], curse: [3, 6], curse2: [1, 2], mirror: [5, 10], wind: [4, 8], beg: [4, 8],
   imp1: [4, 8], imp2: [4, 8], imp3: [4, 8], imp4: [4, 8], imp5: [4, 8],
+  // การ์ดเสริม ต้องตรงกับ EXTRA_TABLE
+  blackout: [2, 4], possess: [2, 4], grave: [2, 4], fate: [2, 4], reverse: [2, 4], bottom: [2, 4],
 };
 const SPARE_TALISMANS = [2, 3];
 
@@ -34,7 +46,10 @@ export function deckCount(kind, n) {
 }
 
 // ---------- วาดหน้าการ์ดลง canvas (ใช้เป็น texture ในฉาก 3 มิติ) ----------
-const GLYPH = { ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜' };
+const GLYPH = {
+  ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜',
+  blackout: 'ดับ', possess: 'เข้า', grave: 'ขุด', fate: 'ดวง', reverse: '↺', bottom: '↓',
+};
 export const CARD_W = 500;
 export const CARD_H = 700; // 5:7
 
@@ -215,7 +230,7 @@ async function paintCardFace(kind) {
 }
 
 // ---------- ป้ายบอกประเภทการ์ด ----------
-const ACTIONS = new Set(['nope', 'sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg']);
+const ACTIONS = new Set(['nope', 'sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', 'blackout', 'possess', 'grave', 'fate', 'reverse', 'bottom']);
 const GOLD = '#e6b04d';
 /** 'action' = การ์ดที่เล่นได้เอง, 'combo' = ผีน้อย (ต้องเล่นเป็นชุด), null = ผีกับยันต์ (เล่นเองไม่ได้) */
 export function cardType(kind) {
@@ -330,7 +345,7 @@ export async function drawCardBack() {
   }
   return c;
 }
-const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg']);
+const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', 'blackout', 'possess', 'grave', 'fate', 'reverse', 'bottom']);
 
 /**
  * ดูว่าการ์ดที่เลือกเล่นได้ไหม
@@ -340,7 +355,7 @@ export function describeSelection(cards) {
   if (!cards.length) return { ok: false, label: 'เลือกการ์ดที่จะเล่น' };
   const k = cards[0].kind;
   const same = cards.every((c) => c.kind === k);
-  if (cards.length === 1 && SINGLE.has(k)) return { ok: true, label: `เล่น ${CARD_INFO[k].name}`, needTarget: k === 'beg' };
+  if (cards.length === 1 && SINGLE.has(k)) return { ok: true, label: `เล่น ${CARD_INFO[k].name}`, needTarget: k === 'beg' || k === 'possess' };
   if (same && CARD_INFO[k].imp && cards.length === 2) return { ok: true, label: 'ขโมยการ์ด (คู่ผีน้อย)', needTarget: true };
   if (same && CARD_INFO[k].imp && cards.length === 3) return { ok: true, label: 'ทวงการ์ด (ผีน้อยสามใบ)', needTarget: true, needName: true };
   if (cards.length === 1 && CARD_INFO[k].imp) return { ok: false, label: 'ผีน้อยต้องเลือกคู่หรือสามใบแบบเดียวกัน' };

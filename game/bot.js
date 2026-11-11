@@ -5,7 +5,9 @@
 const PLAY_CHANCE = 0.45;   // ตาตัวเอง โอกาสเล่นการ์ดก่อนจั่ว
 const NOPE_CHANCE = 0.3;    // คนอื่นเล่นการ์ด โอกาสกด "ไม่!"
 const GRUDGE_CHANCE = 0.25; // ตายแล้ว โอกาสใช้อาฆาตในแต่ละครั้งที่สถานการณ์เปลี่ยน
-const SINGLE = ['sneak', 'curse', 'curse2', 'mirror', 'wind'];
+const SINGLE = ['sneak', 'curse', 'curse2', 'mirror', 'wind', 'blackout', 'grave', 'fate', 'reverse', 'bottom'];
+// ขุดหลุมศพ: อยากได้ใบไหนก่อน
+const DIG_WANT = ['talisman', 'nope', 'sneak', 'curse2', 'curse', 'bottom', 'reverse'];
 const IMPS = ['imp1', 'imp2', 'imp3', 'imp4', 'imp5'];
 
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
@@ -28,6 +30,17 @@ function botMove(v, you, rng, memo) {
   }
   if (pd && pd.kind === 'insert') return pd.player === you ? { type: 'insert', index: Math.floor(rng() * (v.deckCount + 1)) } : null;
   if (pd && pd.kind === 'give') return pd.from === you && me.hand.length ? { type: 'give', uid: pick(me.hand, rng).uid } : null;
+  if (pd && pd.kind === 'dig') {
+    if (pd.player !== you || !me.dig || !me.dig.length) return null;
+    const want = DIG_WANT.map((k) => me.dig.find((c) => c.kind === k)).find(Boolean);
+    return { type: 'dig', uid: (want || pick(me.dig, rng)).uid };
+  }
+  if (pd && pd.kind === 'fate') {
+    // บอตยังต้องจั่วเอง ดันผีลงไปใต้สุดของส่วนที่เห็น
+    if (pd.player !== you || !me.fate) return null;
+    const order = [...me.fate.filter((c) => c.kind !== 'ghost'), ...me.fate.filter((c) => c.kind === 'ghost')];
+    return { type: 'fate', order: order.map((c) => c.uid) };
+  }
   if (pd) return null;
 
   if (!me.alive) {
@@ -39,11 +52,15 @@ function botMove(v, you, rng, memo) {
   const options = me.hand.filter((c) => SINGLE.includes(c.kind)).map((c) => ({ type: 'play', uids: [c.uid] }));
   if (others.length) {
     for (const c of me.hand.filter((x) => x.kind === 'beg')) options.push({ type: 'play', uids: [c.uid], target: pick(others, rng).id });
+
     for (const k of IMPS) {
       const same = me.hand.filter((c) => c.kind === k);
       if (same.length >= 2) options.push({ type: 'play', uids: [same[0].uid, same[1].uid], target: pick(others, rng).id });
     }
   }
+  // ผีเข้า: เลือกใครก็ได้ที่ยังรอด มือว่างก็ได้
+  const living = v.players.filter((p) => p.id !== you && p.alive);
+  if (living.length) for (const c of me.hand.filter((x) => x.kind === 'possess')) options.push({ type: 'play', uids: [c.uid], target: pick(living, rng).id });
   if (options.length && rng() < PLAY_CHANCE) return pick(options, rng);
   return { type: 'draw' };
 }

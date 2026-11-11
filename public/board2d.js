@@ -42,7 +42,37 @@ export async function createBoard(root, hooks) {
   discard.append(el('div', 'b2-discard-slot'), discardImg);
   center.append(deck, discard);
   const hand = el('div', 'b2-hand');
-  root.append(seatsBox, center, hand);
+  // วงลูกศรรอบกองกลาง: ลูกศรทองวิ่งตามทิศการเล่น (ตามเข็ม = ซ้ายไปขวาตามแถวที่นั่ง)
+  const SVG = 'http://www.w3.org/2000/svg';
+  const orbit = document.createElementNS(SVG, 'svg');
+  orbit.setAttribute('class', 'b2-orbit');
+  orbit.setAttribute('aria-hidden', 'true');
+  root.append(seatsBox, orbit, center, hand);
+  let orbitKey = '';
+  /** วาดวงรีรอบกองกลางใหม่เมื่อขนาดหรือทิศเปลี่ยน */
+  function drawOrbit(dir) {
+    const r = center.getBoundingClientRect();
+    if (!r.width) return;
+    const w = Math.round(r.width + 70);
+    const h = Math.round(r.height + 56);
+    const key = `${w}x${h}:${dir}`;
+    if (key === orbitKey) return;
+    orbitKey = key;
+    const rx = w / 2 - 10;
+    const ry = h / 2 - 10;
+    const cx = w / 2;
+    const cy = h / 2;
+    // เริ่มที่จุดซ้าย แล้ววนตามเข็ม (sweep = 1 บนจอที่แกน y ชี้ลง)
+    const d = `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 1 ${2 * rx} 0 a ${rx} ${ry} 0 1 1 ${-2 * rx} 0`;
+    const rev = dir === -1;
+    const motion = (begin) => `<animateMotion dur="7s" repeatCount="indefinite" begin="${begin}s" rotate="${rev ? 'auto-reverse' : 'auto'}"`
+      + (rev ? ' keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : '') + '><mpath href="#b2-orbit-path"/></animateMotion>';
+    orbit.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    orbit.style.width = `${w}px`;
+    orbit.style.height = `${h}px`;
+    orbit.innerHTML = `<path id="b2-orbit-path" class="b2-orbit-ring" d="${d}"/>`
+      + [0, -7 / 3, -14 / 3].map((b) => `<path class="b2-orbit-arrow" d="M -9 -11 L 7 0 L -9 11">${motion(b)}</path>`).join('');
+  }
 
   deck.onclick = () => hooks.onDeckTap && hooks.onDeckTap();
 
@@ -69,13 +99,18 @@ export async function createBoard(root, hooks) {
   function renderSeats(s) {
     const g = s.game;
     const others = g.players.filter((p) => p.id !== s.you);
-    // เรียงเริ่มจากคนถัดจากเรา ให้ลำดับบนจอตรงกับลำดับตา
+    // เรียงตามที่นั่งจริง เริ่มจากคนถัดจากเรา (ทิศปกติ ตาเดินจากซ้ายไปขวา) เดินถอยหลังแล้วที่นั่งไม่ย้าย ลูกศรกลับทางแทน
     const i = g.players.findIndex((p) => p.id === s.you);
-    if (i >= 0) others.sort((a, b) => ((g.players.indexOf(a) - i + g.players.length) % g.players.length) - ((g.players.indexOf(b) - i + g.players.length) % g.players.length));
+    const n = g.players.length;
+    const dist = (p) => (((g.players.indexOf(p) - i) % n) + n) % n;
+    if (i >= 0) others.sort((a, b) => dist(a) - dist(b));
     const keep = new Set(others.map((p) => p.id));
     for (const [id, st] of seats) if (!keep.has(id)) { st.box.remove(); seats.delete(id); }
-    others.forEach((p) => {
+    seatsBox.querySelectorAll('.b2-flow').forEach((a) => a.remove());
+    others.forEach((p, k) => {
       const st = seatFor(p.id);
+      // ลูกศรเล็กระหว่างที่นั่ง ชี้ทางที่ตาเดิน
+      if (k) seatsBox.append(el('span', 'b2-flow', '›'));
       seatsBox.append(st.box);   // เรียงตามลำดับ
       const name = s.room.names[p.id] || '?';
       const current = !g.winner && g.current === p.id;
@@ -149,6 +184,9 @@ export async function createBoard(root, hooks) {
     deck.hidden = g.deckCount <= 0;
     deckCount.textContent = `${g.deckCount} ใบ`;
     deck.style.setProperty('--depth', String(Math.min(3, Math.ceil(g.deckCount / 10))));
+    const dir = g.dir === -1 ? -1 : 1;
+    root.classList.toggle('rev', dir === -1);
+    drawOrbit(dir);
     if (g.discardTop) {
       discardImg.src = face[g.discardTop.kind];
       discardImg.style.setProperty('--tilt', `${tilt(g.discardTop.uid)}deg`);
@@ -187,6 +225,20 @@ export async function createBoard(root, hooks) {
     f.style.top = `${to.y}px`;
     f.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${(Math.random() * 16 - 8).toFixed(1)}deg)`;
     return wait(ms).then(() => f.remove());
+  }
+
+  /** ดวงวิญญาณลอยจากคนหนึ่งไปอีกคน (อาฆาต, ผีเข้า) */
+  async function wisp(a, b) {
+    if (reduced) return;
+    const w = el('div', 'b2-wisp');
+    w.style.left = `${a.x}px`;
+    w.style.top = `${a.y}px`;
+    document.body.append(w);
+    w.getBoundingClientRect();
+    w.style.left = `${b.x}px`;
+    w.style.top = `${b.y}px`;
+    await wait(800);
+    w.remove();
   }
 
   function pulse(target, cls, ms) {
@@ -231,18 +283,38 @@ export async function createBoard(root, hooks) {
       case 'demand':
         if (e.empty || e.got === false) return;
         return fly(e.card && (e.to === you || e.from === you) ? face[e.card.kind] : backUrl, rectOf(e.from), rectOf(e.to));
+      case 'possess': {
+        if (e.empty) return;
+        await wisp(rectOf(e.from), rectOf(e.to));
+        const st = seats.get(e.to);
+        if (st) pulse(st.box, 'alert', 1200);
+        return;
+      }
+      case 'blackout':
+        pulse(root, 'blackout', 1400);
+        return wait(500);
+      case 'pass':
+        return fly(e.card && (e.to === you || e.from === you) ? face[e.card.kind] : backUrl, rectOf(e.from), rectOf(e.to), { ms: 420 });
+      case 'dig':
+        if (e.empty) return;
+        return fly(face[e.card.kind], centerOf(discard), rectOf(e.player));
+      case 'fate':
+        pulse(deck, 'fate', 900);
+        return wait(500);
+      case 'reverse': {
+        pulse(orbit, 'flash', 1200);
+        const pop = el('div', 'b2-pop b2-pop-rev', e.dir === -1 ? '↺ กลับทิศ!' : '↻ กลับทิศ!');
+        const c = centerOf(center);
+        pop.style.left = `${c.x}px`;
+        pop.style.top = `${c.y}px`;
+        document.body.append(pop);
+        await wait(900);
+        pop.remove();
+        return;
+      }
       case 'grudge': {
-        const w = el('div', 'b2-wisp');
-        const a = rectOf(e.from);
         const b = rectOf(e.to);
-        w.style.left = `${a.x}px`;
-        w.style.top = `${a.y}px`;
-        document.body.append(w);
-        w.getBoundingClientRect();
-        w.style.left = `${b.x}px`;
-        w.style.top = `${b.y}px`;
-        await wait(800);
-        w.remove();
+        await wisp(rectOf(e.from), b);
         return fly(face[e.card.kind], b, centerOf(discard));
       }
       case 'win': {

@@ -53,6 +53,10 @@
     <button id="invite" class="btn">คัดลอกลิงก์เชิญ</button>
     <ul id="lobby-players" class="players"></ul>
     <button id="add-bot" class="btn" hidden>เพิ่มบอต</button>
+    <label id="extras" class="toggle" hidden>
+      <input type="checkbox">
+      <span class="toggle-text"><b>การ์ดเสริม</b><small>ไฟดับ · ผีเข้า · ขุดหลุมศพ · ผูกดวง · เดินถอยหลัง · จั่วก้นกอง</small></span>
+    </label>
     <p id="lobby-hint" class="muted"></p>
     <button id="start" class="btn primary" hidden>เริ่มเกม</button>
   </main>
@@ -98,13 +102,17 @@
           <span>ไม่!</span>
         </button>
         <button id="play" class="btn primary" hidden></button>
-        <button id="draw" class="btn draw" hidden>จั่ว</button>
+        <button id="draw" class="btn draw" hidden><span>จั่ว</span><span id="draw-turns" class="draw-turns" hidden></span></button>
         <button id="grudge" class="btn ghostly" hidden>อาฆาต</button>
       </div>
     </footer>
     <div id="winner" class="winner" hidden>
       <div class="winner-box">
         <div id="winner-text"></div>
+        <label id="again-extras" class="toggle" hidden>
+          <input type="checkbox">
+          <span class="toggle-text"><b>การ์ดเสริม</b><small>ไฟดับ · ผีเข้า · ขุดหลุมศพ · ผูกดวง · เดินถอยหลัง · จั่วก้นกอง</small></span>
+        </label>
         <button id="again-bot" class="btn" hidden>เพิ่มบอต</button>
         <button id="again" class="btn primary" hidden>เล่นอีกรอบ</button>
         <p id="again-hint" class="muted"></p>

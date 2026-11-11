@@ -107,7 +107,7 @@ function newCode() {
 
 function createRoom() {
   const r = {
-    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null,
+    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: false,
     windowTimer: null, windowEndsAt: 0, takeoverTimer: null, takeoverFor: null, idleTimer: null,
   };
   rooms.set(r.code, r);
@@ -123,7 +123,7 @@ function listRooms() {
   const out = [];
   for (const r of rooms.values()) {
     if (!humanOnline(r)) continue;
-    out.push({ code: r.code, name: `ห้องของ ${hostName(r)}`, players: r.players.length, max: MAX_SEATS, status: inGame(r) ? 'play' : 'lobby' });
+    out.push({ code: r.code, name: `ห้องของ ${hostName(r)}`, players: r.players.length, max: MAX_SEATS, status: inGame(r) ? 'play' : 'lobby', extras: r.extras });
   }
   out.sort((a, b) => (a.status === b.status ? 0 : a.status === 'lobby' ? -1 : 1) || a.code.localeCompare(b.code));
   return out;
@@ -158,6 +158,7 @@ function stateFor(r, p) {
       code: r.code,
       name: `ห้องของ ${hostName(r)}`,
       hostId: r.hostId,
+      extras: r.extras,   // ตัวเลือกห้อง: ใส่การ์ดเสริมในเกมถัดไป
       players: r.players.map((x) => ({ id: x.id, name: x.name, online: x.online, seat: x.seat, bot: !!x.bot })),
       names: r.names,
     },
@@ -283,7 +284,7 @@ function startGame(r) {
   for (const p of r.players) p.seat = seated.includes(p) ? 'player' : 'watch';
   for (const p of seated) { clearTimeout(p.dropTimer); p.dropTimer = null; r.names[p.id] = p.name; if (p.bot) p.memo = {}; }
   r.rng = SEED != null ? makeRng(SEED) : Math.random;
-  r.game = G.createGame(seated.map((p) => p.id), r.rng);
+  r.game = G.createGame(seated.map((p) => p.id), r.rng, { extras: r.extras });
   r.windowEndsAt = 0;
   afterChange(r, [{ type: 'start' }]);
 }
@@ -395,6 +396,13 @@ wss.on('connection', (ws) => {
         if ((type === 'draw' || type === 'nope') && typeof m.seq === 'number' && m.seq !== r.seq) return fail('', 'stale');
         const err = runAct(r, me, m.action);
         return err ? fail(err) : undefined;
+      }
+      case 'options': {
+        // ตัวเลือกห้อง เปลี่ยนได้ตอนไม่มีเกมกำลังเล่น มีผลกับเกมถัดไป
+        if (!isHost) return fail('หัวห้องเป็นคนตั้งค่าห้อง');
+        if (inGame(r)) return fail('เปลี่ยนได้หลังจบเกม');
+        if (typeof m.extras === 'boolean') r.extras = m.extras;
+        return broadcast(r);
       }
       case 'addBot': {
         if (!isHost) return fail('หัวห้องเป็นคนเพิ่มบอต');
