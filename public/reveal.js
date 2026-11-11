@@ -38,7 +38,7 @@ async function run(who, saved) {
   await wait(420);
   box.classList.add('flip');               // พลิกเป็นหน้าผี
   await wait(260);
-  sound.play('ghost');
+  if (!saved) sound.play('ghost');         // มียันต์ ไม่ต้องหัวเราะ เดี๋ยวมีเสียง holy
   box.classList.add('scare');              // แสงแดงวาบ จอสั่น
   document.body.classList.add('shake');
   $('reveal-text').textContent = who === 'คุณ' ? 'คุณจั่วได้ผี!' : `${who} จั่วได้ผี!`;

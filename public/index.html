@@ -65,6 +65,12 @@
         <button id="menu-btn" class="btn ghost small" aria-haspopup="true">เมนู</button>
       </div>
     </header>
+    <!-- กล่องปรับเสียง: เปิดจากปุ่มลำโพง -->
+    <div id="vol-pop" class="vol-pop" hidden>
+      <button id="vol-mute" class="btn ghost small icon-btn" aria-label="ปิดเสียง"></button>
+      <input id="vol-range" type="range" min="0" max="100" step="1" aria-label="ความดัง">
+      <span id="vol-num" class="vol-num"></span>
+    </div>
     <div id="menu" class="menu" hidden>
       <div id="menu-players"></div>
       <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
@@ -141,6 +147,13 @@
         <img id="reveal-back" class="reveal-side reveal-back" alt="">
         <img id="reveal-face" class="reveal-side reveal-face" alt="ผี">
       </div>
+    </div>
+    <!-- แสงศักดิ์สิทธิ์ตอนยันต์ปัดเป่า: รัศมีหมุน วงแสง และประกาย -->
+    <div class="reveal-holy" aria-hidden="true">
+      <div class="holy-rays"></div>
+      <div class="holy-glow"></div>
+      <div class="holy-ring"></div>
+      <div class="holy-sparks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
     <div id="reveal-talisman" class="reveal-talisman"><img alt="ยันต์"></div>
     <div class="reveal-caption">

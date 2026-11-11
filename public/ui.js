@@ -586,20 +586,47 @@ const ICON_ON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="tr
 const ICON_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' + SPEAKER
   + '<path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
+// เสียงเบา: คลื่นเสียงเส้นเดียว
+const ICON_LOW = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' + SPEAKER
+  + '<path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
 function renderMute() {
-  const off = sound.isMuted();
+  const vol = sound.getVolume();
+  const off = sound.isMuted() || vol <= 0;
+  const icon = off ? ICON_OFF : vol < 0.45 ? ICON_LOW : ICON_ON;
+  // ปุ่มด้านบน: บอกสถานะเสียงตอนนี้ กดเพื่อเปิดกล่องปรับเสียง
   const b = $('mute-btn');
-  b.innerHTML = off ? ICON_OFF : ICON_ON;
-  b.setAttribute('aria-label', off ? 'เปิดเสียง' : 'ปิดเสียง');
-  b.title = off ? 'เปิดเสียง' : 'ปิดเสียง';
+  b.innerHTML = icon;
+  b.setAttribute('aria-label', 'ปรับเสียง');
+  b.title = 'ปรับเสียง';
   b.classList.toggle('muted', off);
+  // ในกล่อง: ปุ่มไอคอนปิด/เปิดเสียง กับ slider ความดัง
+  const m = $('vol-mute');
+  m.innerHTML = sound.isMuted() ? ICON_OFF : icon;
+  m.setAttribute('aria-label', sound.isMuted() ? 'เปิดเสียง' : 'ปิดเสียง');
+  m.title = sound.isMuted() ? 'เปิดเสียง' : 'ปิดเสียง';
+  m.classList.toggle('muted', sound.isMuted());
+  $('vol-range').value = String(Math.round(vol * 100));
+  $('vol-range').disabled = sound.isMuted();
+  $('vol-num').textContent = sound.isMuted() ? 'ปิด' : `${Math.round(vol * 100)}%`;
+}
+
+function toggleVolumePop(open = $('vol-pop').hidden) {
+  const pop = $('vol-pop');
+  pop.hidden = !open;
+  if (!open) return;
+  // วางกล่องใต้ปุ่มลำโพง ชิดขอบขวาของปุ่ม
+  const r = $('mute-btn').getBoundingClientRect();
+  pop.style.top = `${r.bottom + 8}px`;
+  pop.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+  $('menu').hidden = true;
 }
 
 /** เสียงตามเหตุการณ์ในเกม */
 function soundFor(e) {
   switch (e.type) {
     case 'play': e.kinds.forEach((_, i) => sound.play('card', { delay: i * 0.09 })); break;
-    case 'nope': sound.play('card', { gain: 1.15 }); break;
+    case 'nope': sound.play('nope'); break;
     case 'draw': sound.play('draw'); break;
     case 'wind': sound.play('shuffle'); break;
     case 'insert': case 'grudge': sound.play('card'); break;
@@ -626,7 +653,21 @@ export function initUI() {
   $('lobby-leave').onclick = () => leaveRoom();
   $('game-leave').onclick = () => { if (confirm('ออกจากห้อง? ถ้าเกมกำลังเล่นอยู่ คุณจะตกรอบ')) { $('menu').hidden = true; leaveRoom(); } };
   $('menu-btn').onclick = () => { $('menu').hidden = !$('menu').hidden; };
-  $('mute-btn').onclick = () => { sound.setMuted(!sound.isMuted()); renderMute(); };
+  $('mute-btn').onclick = () => toggleVolumePop();
+  $('vol-mute').onclick = () => {
+    const unmute = sound.isMuted();
+    sound.setMuted(!unmute);
+    if (unmute && sound.getVolume() <= 0) sound.setVolume(0.5);   // เปิดเสียงแต่ความดังเป็น 0 ตั้งไว้ครึ่งหนึ่ง
+    renderMute();
+    if (unmute) sound.play('card');
+  };
+  $('vol-range').oninput = (e) => { sound.setVolume(Number(e.target.value) / 100); renderMute(); };
+  // ปล่อยมือจาก slider เล่นเสียงตัวอย่างให้ได้ยินว่าดังแค่ไหน
+  $('vol-range').onchange = () => sound.play('card');
+  // แตะที่อื่น กล่องปรับเสียงปิด
+  document.addEventListener('pointerdown', (e) => {
+    if (!$('vol-pop').hidden && !$('vol-pop').contains(e.target) && !$('mute-btn').contains(e.target)) toggleVolumePop(false);
+  });
   renderMute();
   // เบราว์เซอร์อนุญาตเสียงหลังผู้ใช้แตะหน้าจอ
   document.addEventListener('pointerdown', () => sound.unlock(), { passive: true });

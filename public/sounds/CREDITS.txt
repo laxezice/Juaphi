@@ -7,3 +7,6 @@ card.mp3, draw.mp3 = card-place-1.ogg
 ghost.mp3 = "Scary Female Halloween Horror Laughter Vol 006" by alesiadavina (Pixabay, id 165223)
            Pixabay Content License https://pixabay.com/service/license-summary/
            ตัดความเงียบท้ายและใส่ fade out แล้ว ใช้เป็นเสียงประกอบในเกมเท่านั้น
+
+nope.mp3     = wrong.mp3 จากผู้ใช้ (ที่มาไม่ระบุ) ตัดช่วงเงียบด้านหน้าออก
+talisman.mp3 = holy.mp3 จากผู้ใช้ (ที่มาไม่ระบุ) ตัดช่วงเงียบหัวท้ายและใส่ fade out

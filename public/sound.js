@@ -1,21 +1,35 @@
-// เสียงในเกม: 'shuffle' (สับกอง), 'card' (เล่น/ย้ายการ์ด), 'draw' (จั่ว), 'ghost' (จั่วได้ผี), 'talisman' (ยันต์ปัดเป่า)
+// เสียงในเกม: 'shuffle' (สับกอง), 'card' (เล่น/ย้ายการ์ด), 'draw' (จั่ว), 'nope' (กด ไม่!), 'ghost' (จั่วได้ผี), 'talisman' (ยันต์ปัดเป่า)
 // ถ้ามีไฟล์ public/sounds/<ชื่อ>.ogg|mp3|wav ใช้ไฟล์นั้น ไม่มีก็สังเคราะห์เสียงไพ่ด้วย Web Audio
-// ปิดเสียงได้ (จำไว้ในเครื่อง) เบราว์เซอร์ยอมให้เล่นเสียงหลังผู้ใช้แตะหน้าจอครั้งแรกเท่านั้น
+// ปิดเสียงและปรับความดังรวมได้ (จำไว้ในเครื่อง) เบราว์เซอร์ยอมให้เล่นเสียงหลังผู้ใช้แตะหน้าจอครั้งแรกเท่านั้น
 
 const VERSION = document.querySelector('meta[name=juaphi-version]')?.content || '';
 const KEY = 'juaphi:muted';
+const VOL_KEY = 'juaphi:volume';
 let ctx = null;
+let master = null;   // ทุกเสียงผ่านตัวนี้ ความดังรวมอยู่ที่นี่
 let files = null;
 const buffers = new Map();
 let noise = null;
-let muted = (() => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } })();
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+let muted = load(KEY, '0') === '1';
+let volume = Math.min(1, Math.max(0, Number(load(VOL_KEY, '0.8')) || 0));
 const listeners = [];
+const changed = () => listeners.forEach((fn) => fn({ muted, volume }));
 
 export const isMuted = () => muted;
 export function setMuted(v) {
   muted = !!v;
-  try { localStorage.setItem(KEY, muted ? '1' : '0'); } catch {}
-  listeners.forEach((fn) => fn(muted));
+  save(KEY, muted ? '1' : '0');
+  changed();
+}
+export const getVolume = () => volume;
+/** ความดังรวม 0..1 จำไว้ในเครื่อง */
+export function setVolume(v) {
+  volume = Math.min(1, Math.max(0, Number(v) || 0));
+  save(VOL_KEY, String(volume));
+  if (master) master.gain.value = volume;
+  changed();
 }
 export const onMuteChange = (fn) => listeners.push(fn);
 
@@ -24,6 +38,9 @@ function audio() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = volume;
+    master.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   return ctx;
@@ -50,11 +67,13 @@ const TUNE = {
   card: { rate: 1.25, gain: 0.6 },
   draw: { rate: 1.25, gain: 0.6 },
   ghost: { rate: 1.25, gain: 0.5 },
+  nope: { rate: 1, gain: 0.3 },        // เสียง wrong ต้นฉบับดังมาก เลยเบาไว้
+  talisman: { rate: 1, gain: 0.9 },    // เสียง holy ต้นฉบับค่อนข้างเบา
 };
 
 /** เล่นเสียง delay = วินาทีที่รอก่อนเล่น */
 export async function play(name, { gain = 1, delay = 0 } = {}) {
-  if (muted) return;
+  if (muted || volume <= 0) return;
   const a = audio();
   if (!a || a.state !== 'running') return;
   const buf = await buffer(name);
@@ -66,11 +85,12 @@ export async function play(name, { gain = 1, delay = 0 } = {}) {
     src.playbackRate.value = tune.rate || 1;
     const g = a.createGain();
     g.gain.value = gain * (tune.gain ?? 1);
-    src.connect(g).connect(a.destination);
+    src.connect(g).connect(master);
     src.start(t);
     return;
   }
   if (SYNTH[name]) SYNTH[name](a, t, gain);
+  else if (name === 'nope') SYNTH.card(a, t, gain * 1.15);   // ไม่มีไฟล์ ใช้เสียงวางการ์ดแทน
 }
 
 // ---------- เสียงสังเคราะห์ (ใช้เมื่อไม่มีไฟล์) ----------
@@ -96,7 +116,7 @@ function swish(a, t, { freq = 2800, to = freq, dur = 0.1, q = 0.9, level = 0.5 }
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(level, t + 0.006);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(bp).connect(g).connect(a.destination);
+  src.connect(bp).connect(g).connect(master);
   src.start(t, Math.random() * 0.5);
   src.stop(t + dur + 0.02);
 }
@@ -110,7 +130,7 @@ function tap(a, t, level = 0.25) {
   const g = a.createGain();
   g.gain.setValueAtTime(level, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
-  o.connect(g).connect(a.destination);
+  o.connect(g).connect(master);
   o.start(t);
   o.stop(t + 0.07);
 }
@@ -126,7 +146,7 @@ function tone(a, t, { type = 'sine', freq = 440, to = freq, dur = 0.5, level = 0
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(level, t + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(a.destination);
+  o.connect(g).connect(master);
   o.start(t);
   o.stop(t + dur + 0.05);
 }
