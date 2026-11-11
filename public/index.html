@@ -8,8 +8,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script type="importmap">{ "imports": { "three": "/vendor/three.module.js" } }</script>
+  <!-- __V__ คือเลขรุ่นที่เซิร์ฟเวอร์ใส่ให้ตอนส่งหน้านี้ deploy ใหม่ = URL ใหม่ เบราว์เซอร์จะไม่ใช้โค้ดเก่าที่เก็บไว้ -->
+  <meta name="juaphi-version" content="__V__">
+  <link rel="stylesheet" href="style.css?v=__V__">
+  <script type="importmap">{ "imports": {
+    "three": "/vendor/three.module.js",
+    "/ui.js": "/ui.js?v=__V__",
+    "/net.js": "/net.js?v=__V__",
+    "/cards.js": "/cards.js?v=__V__",
+    "/scene.js": "/scene.js?v=__V__"
+  } }</script>
 </head>
 <body>
   <canvas id="scene" aria-hidden="true"></canvas>
@@ -85,6 +93,6 @@
   <div id="toast" class="toast" hidden></div>
   <div id="conn" class="conn" hidden>กำลังเชื่อมต่อใหม่…</div>
 
-  <script type="module" src="main.js"></script>
+  <script type="module" src="main.js?v=__V__"></script>
 </body>
 </html>

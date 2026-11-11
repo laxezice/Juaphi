@@ -23,6 +23,8 @@ const GLYPH = { ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!'
 export const CARD_W = 500;
 export const CARD_H = 700; // 5:7
 
+// เลขรุ่นจาก index.html ต่อท้าย URL ภาพ deploy ใหม่แล้วได้ภาพใหม่ทันที
+const VERSION = (typeof document !== 'undefined' && document.querySelector('meta[name=juaphi-version]')?.content) || '';
 let artList = null;
 /** id การ์ด -> ชื่อไฟล์ภาพ ถ้ามีทั้ง .webp และ .png ใช้ .webp เพราะเล็กกว่ามาก */
 async function availableArt() {
@@ -90,7 +92,7 @@ export async function drawCardFace(kind) {
   c.width = CARD_W; c.height = CARD_H;
   const ctx = c.getContext('2d');
   const file = (await availableArt()).get(kind);
-  const art = file ? await loadImage(`/cards/${file}`) : null;
+  const art = file ? await loadImage(`/cards/${file}?v=${VERSION}`) : null;
 
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 36);
   ctx.save();
@@ -165,7 +167,7 @@ export async function drawCardBack() {
   c.width = CARD_W; c.height = CARD_H;
   const ctx = c.getContext('2d');
   const backFile = (await availableArt()).get('back');
-  const art = backFile ? await loadImage(`/cards/${backFile}`) : null;
+  const art = backFile ? await loadImage(`/cards/${backFile}?v=${VERSION}`) : null;
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 36);
   ctx.clip();
   if (art) { ctx.drawImage(art, 0, 0, CARD_W, CARD_H); return c; }

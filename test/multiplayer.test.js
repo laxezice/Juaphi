@@ -274,6 +274,13 @@ test('/api/art lists the card images that exist, and three.js is served', async 
     const r = await fetch(`http://127.0.0.1:${srv.port}${f}`);
     assert.equal(r.headers.get('cache-control'), 'no-cache', f);
   }
+  // Cloudflare ทับ Cache-Control ของ .js ได้ หน้าเว็บเลยใส่เลขรุ่นใน URL ของโค้ดทุกไฟล์ deploy ใหม่ = URL ใหม่
+  const html = await (await fetch(`http://127.0.0.1:${srv.port}/`)).text();
+  assert.ok(!html.includes('__V__'));
+  const v = html.match(/main\.js\?v=([\w-]+)/);
+  assert.ok(v, 'main.js is versioned');
+  for (const f of ['style.css', '/ui.js', '/net.js', '/cards.js', '/scene.js']) assert.ok(html.includes(`${f}?v=${v[1]}`), f);
+  assert.ok(html.includes(`content="${v[1]}"`), 'version meta for card images');
   const three = await fetch(`http://127.0.0.1:${srv.port}/vendor/three.module.js`);
   assert.equal(three.status, 200);
   const evil = await fetch(`http://127.0.0.1:${srv.port}/..%2fpackage.json`);

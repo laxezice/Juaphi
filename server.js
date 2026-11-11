@@ -24,6 +24,7 @@ const GRACE_MS = Number(process.env.JUAPHI_GRACE_MS) || 15000; // หลุด�
 const SEED = process.env.JUAPHI_SEED ? Number(process.env.JUAPHI_SEED) : null; // ใช้ในเทสต์เท่านั้น
 const LOBBY_DROP_MS = 60 * 1000;      // หลุดตอนไม่ได้เล่นอยู่นานเท่านี้ ตัดชื่อออก
 const ROOM_IDLE_MS = 30 * 60 * 1000;  // ไม่มีใครออนไลน์นานเท่านี้ ลบห้อง
+const VERSION = Date.now().toString(36);  // เปลี่ยนทุกครั้งที่เซิร์ฟเวอร์เริ่ม (deploy) ใช้ต่อท้าย URL ของโค้ดหน้าเว็บ
 const BOT_MS = Number(process.env.JUAPHI_BOT_MS) || 900;      // บอตคิดนาน BOT_MS ถึง 2×BOT_MS ก่อนทำอะไร
 const BOT_NAMES = ['บอตปอบ', 'บอตกระสือ', 'บอตกระหัง', 'บอตตานี', 'บอตกุมาร', 'บอตเปรต', 'บอตโขมด'];
 
@@ -58,7 +59,14 @@ const server = http.createServer((req, res) => {
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { p = '/'; }
   if (p.includes('\0')) { res.writeHead(400); return res.end(); }
-  if (p === '/') p = '/index.html';
+  if (p === '/' || p === '/index.html') {
+    // ใส่เลขรุ่นลงใน URL ของโค้ด (Cloudflare ให้เบราว์เซอร์เก็บ .js ไว้ 4 ชม. ทับ Cache-Control ของเรา)
+    return fs.readFile(path.join(PUBLIC, 'index.html'), 'utf8', (err, html) => {
+      if (err) { res.writeHead(500); return res.end(); }
+      res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache' });
+      res.end(html.replaceAll('__V__', VERSION));
+    });
+  }
   if (p === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (p === '/api/art') {
     // ไฟล์ภาพการ์ดที่มีอยู่จริงใน public/cards (.webp หรือ .png) หน้าเว็บจะได้ไม่ต้องลองโหลดไฟล์ที่ไม่มี
