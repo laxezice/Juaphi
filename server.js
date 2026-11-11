@@ -284,9 +284,15 @@ function startGame(r) {
   for (const p of r.players) p.seat = seated.includes(p) ? 'player' : 'watch';
   for (const p of seated) { clearTimeout(p.dropTimer); p.dropTimer = null; r.names[p.id] = p.name; if (p.bot) p.memo = {}; }
   r.rng = SEED != null ? makeRng(SEED) : Math.random;
-  r.game = G.createGame(seated.map((p) => p.id), r.rng, { extras: r.extras });
+  // คนเริ่ม: คนที่ตกรอบคนแรกในเกมก่อน ถ้าไม่มี (เกมแรกของห้อง หรือคนนั้นไม่ได้เล่นรอบนี้) สุ่ม
+  // ตอนเทสต์ (JUAPHI_SEED) ให้ที่นั่งแรกเริ่มเสมอ ผลจะได้ตายตัว
+  const ids = seated.map((p) => p.id);
+  const prev = r.game && r.game.firstOut;
+  const fromPrev = !!prev && ids.includes(prev);
+  const first = fromPrev ? prev : ids[SEED != null ? 0 : Math.floor(Math.random() * ids.length)];
+  r.game = G.createGame(ids, r.rng, { extras: r.extras, first });
   r.windowEndsAt = 0;
-  afterChange(r, [{ type: 'start' }]);
+  afterChange(r, [{ type: 'start', player: first, reason: fromPrev ? 'firstOut' : 'random' }]);
 }
 
 function removeFromRoom(r, p) {

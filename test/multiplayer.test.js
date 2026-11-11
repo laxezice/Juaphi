@@ -116,6 +116,24 @@ test('the host turns on extra cards; it shows in the room list and the next game
   assert.equal(a.state.room.extras, true);
 });
 
+test('the next game starts with the player who was out first', { timeout: 20000 }, async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: '3' });
+  const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
+  const stops = [a, b, c].map(autoHuman);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && a.state.game.winner, 15000);
+  stops.forEach((s) => s());
+  const outFirst = a.msgs.map((x) => x.m).find((m) => m.t === 'event' && m.e && m.e.type === 'ghost' && !m.e.saved)
+    || a.msgs.map((x) => x.m).find((m) => m.t === 'event' && m.event && m.event.type === 'ghost' && !m.event.saved);
+  assert.ok(outFirst, 'someone was out');
+  const who = (outFirst.e || outFirst.event).player;
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && !a.state.game.winner);
+  assert.equal(a.state.game.current, who);
+  const start = a.msgs.map((x) => x.m).filter((m) => m.t === 'event').map((m) => m.e || m.event).filter((e) => e.type === 'start').at(-1);
+  assert.deepEqual([start.player, start.reason], [who, 'firstOut']);
+});
+
 test('kicking every bot mid-game ends it; the lone host can add a bot and start again', async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
   const [a] = await setupRoom(srv, ['A']);
@@ -464,7 +482,8 @@ test('No! during the window cancels the play', async (t) => {
 });
 
 test('the game plays for a disconnected current player after the grace time', async (t) => {
-  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '300' });
+  // JUAPHI_SEED: ที่นั่งแรก (A) เริ่มก่อนเสมอ
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '300', JUAPHI_SEED: '1' });
   const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
   a.send({ t: 'start' });
   await waitFor(() => b.state.game);
@@ -515,7 +534,7 @@ test('a room accepts at most 8 people including watchers', async (t) => {
 });
 
 test('leaving mid-game removes the player and the game continues', async (t) => {
-  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30' });
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: '1' });
   const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
   a.send({ t: 'start' });
   await waitFor(() => b.state.game);

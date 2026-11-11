@@ -48,7 +48,9 @@ function log(text) {
 export function describe(e, you, nameOf) {
   const n = nameOf;
   switch (e.type) {
-    case 'start': return 'เริ่มเกม! ระวังผีในกอง';
+    case 'start':
+      if (!e.player) return 'เริ่มเกม! ระวังผีในกอง';
+      return `เริ่มเกม! ${n(e.player)} เริ่มก่อน${e.reason === 'firstOut' ? ' (ตกรอบคนแรกเมื่อรอบที่แล้ว)' : ' (สุ่ม)'}`;
     case 'draw': {
       const how = e.for ? `โดนผีเข้า จั่วแทน ${n(e.for)}` : e.bottom ? 'จั่วก้นกอง' : 'จั่ว';
       return e.player === you && e.card ? `คุณ${how}ได้ ${cardName(e.card.kind)}` : `${n(e.player)} ${how}การ์ด`;

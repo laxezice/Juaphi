@@ -6,21 +6,22 @@ const { buildDeck, shuffle } = require('./deck');
 
 /**
  * @param {string[]} playerIds ตามลำดับที่นั่ง
- * @param {{extras?: boolean}} [opts] extras = ใส่การ์ดเสริมลงกอง
+ * @param {{extras?: boolean, first?: string}} [opts] extras = ใส่การ์ดเสริมลงกอง, first = คนเริ่มก่อน (ไม่ระบุ = ที่นั่งแรก)
  */
-function createGame(playerIds, rng, { extras = false } = {}) {
+function createGame(playerIds, rng, { extras = false, first } = {}) {
   const { hands, deck } = buildDeck(playerIds.length, rng, { extras });
   return {
     players: playerIds.map((id, i) => ({ id, hand: hands[i], alive: true, grudge: false })),
     deck,
     discard: [],
-    current: playerIds[0],
+    current: playerIds.includes(first) ? first : playerIds[0],
     turnsLeft: 1,
     cursed: false,
     dir: 1,          // ทิศการเล่น 1 = ตามที่นั่ง, -1 = ย้อนกลับ (การ์ดเดินถอยหลัง)
     extras,
     pending: null,
     winner: null,
+    firstOut: null,  // คนแรกที่โดนผีตกรอบ (เกมถัดไปเริ่มที่คนนี้)
   };
 }
 
@@ -65,6 +66,7 @@ function checkWinner(g, events) {
 
 /** ตาย: มือลงกองทิ้ง ได้สิทธิ์อาฆาต */
 function kill(g, p) {
+  if (!g.firstOut) g.firstOut = p.id;
   g.discard.push(...p.hand);
   p.hand = [];
   p.alive = false;

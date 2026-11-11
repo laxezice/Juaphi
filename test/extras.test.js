@@ -242,3 +242,14 @@ test('bot-only games with extra cards always finish', () => {
     }
   }
 });
+
+// ---------- คนเริ่มเกม ----------
+test('createGame starts with the chosen player, and remembers who is out first', () => {
+  const g = createGame(['A', 'B', 'C'], makeRng(2), { first: 'C' });
+  assert.equal(g.current, 'C');
+  assert.equal(createGame(['A', 'B'], makeRng(2), { first: 'Z' }).current, 'A');
+  const h = rig({ A: [], B: [], C: [] }, ['ghost', 'ghost', 'mirror']);
+  act(h, 'A', { type: 'draw' }, R);
+  act(h, 'B', { type: 'draw' }, R);
+  assert.equal(h.firstOut, 'A');
+});

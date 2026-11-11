@@ -42,36 +42,43 @@ export async function createBoard(root, hooks) {
   discard.append(el('div', 'b2-discard-slot'), discardImg);
   center.append(deck, discard);
   const hand = el('div', 'b2-hand');
-  // วงลูกศรรอบกองกลาง: ลูกศรทองวิ่งตามทิศการเล่น (ตามเข็ม = ซ้ายไปขวาตามแถวที่นั่ง)
+  // วงลูกศรใหญ่รอบกองกลาง: ลูกศรทองวิ่งตามทิศการเล่น (ตามเข็ม = ซ้ายไปขวาตามแถวที่นั่ง)
+  // ใช้พื้นที่ว่างระหว่างแถวที่นั่งกับมือให้มากที่สุด โดยไม่ทับที่นั่ง มือ และปุ่มจั่ว (อยู่หลังทุกอย่าง)
   const SVG = 'http://www.w3.org/2000/svg';
   const orbit = document.createElementNS(SVG, 'svg');
   orbit.setAttribute('class', 'b2-orbit');
   orbit.setAttribute('aria-hidden', 'true');
-  root.append(seatsBox, orbit, center, hand);
+  root.append(orbit, seatsBox, center, hand);
   let orbitKey = '';
-  /** วาดวงรีรอบกองกลางใหม่เมื่อขนาดหรือทิศเปลี่ยน */
-  function drawOrbit(dir) {
+  /** จัดพื้นที่กลางจอ: กองกลางกับวงลูกศรอยู่กึ่งกลางพื้นที่ว่าง แล้ววาดวงรีใหม่ถ้าขนาดหรือทิศเปลี่ยน */
+  function layoutMiddle(dir, handH) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
     const r = center.getBoundingClientRect();
     if (!r.width) return;
-    const w = Math.round(r.width + 70);
-    const h = Math.round(r.height + 56);
+    const narrow = W < 700;   // จอแคบ ปุ่มจั่วกับข้อความอยู่เหนือมือ เว้นที่ให้
+    const top = seatsBox.getBoundingClientRect().bottom + 8;
+    const bottom = H - handH - (narrow ? 124 : 8);
+    root.style.setProperty('--mid-y', `${Math.round((top + bottom) / 2)}px`);
+    const w = Math.round(narrow ? W - 12 : Math.min(W - 40, Math.max(r.width + 200, 680)));
+    const h = Math.round(Math.max(bottom - top, r.height + 60));
     const key = `${w}x${h}:${dir}`;
     if (key === orbitKey) return;
     orbitKey = key;
-    const rx = w / 2 - 10;
-    const ry = h / 2 - 10;
+    const rx = w / 2 - 18;
+    const ry = h / 2 - 18;
     const cx = w / 2;
     const cy = h / 2;
     // เริ่มที่จุดซ้าย แล้ววนตามเข็ม (sweep = 1 บนจอที่แกน y ชี้ลง)
     const d = `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 1 ${2 * rx} 0 a ${rx} ${ry} 0 1 1 ${-2 * rx} 0`;
     const rev = dir === -1;
-    const motion = (begin) => `<animateMotion dur="7s" repeatCount="indefinite" begin="${begin}s" rotate="${rev ? 'auto-reverse' : 'auto'}"`
+    const motion = (begin) => `<animateMotion dur="10s" repeatCount="indefinite" begin="${begin}s" rotate="${rev ? 'auto-reverse' : 'auto'}"`
       + (rev ? ' keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : '') + '><mpath href="#b2-orbit-path"/></animateMotion>';
     orbit.setAttribute('viewBox', `0 0 ${w} ${h}`);
     orbit.style.width = `${w}px`;
     orbit.style.height = `${h}px`;
     orbit.innerHTML = `<path id="b2-orbit-path" class="b2-orbit-ring" d="${d}"/>`
-      + [0, -7 / 3, -14 / 3].map((b) => `<path class="b2-orbit-arrow" d="M -9 -11 L 7 0 L -9 11">${motion(b)}</path>`).join('');
+      + [0, -2.5, -5, -7.5].map((b) => `<path class="b2-orbit-arrow" d="M -13 -16 L 10 0 L -13 16">${motion(b)}</path>`).join('');
   }
 
   deck.onclick = () => hooks.onDeckTap && hooks.onDeckTap();
@@ -167,6 +174,7 @@ export async function createBoard(root, hooks) {
     // ui.js วางปุ่มและข้อความเหนือมือจากค่านี้
     const top = n ? HAND_BOTTOM + cardH + LIFT + 8 : HAND_BOTTOM;
     document.documentElement.style.setProperty('--hand-h', `${top}px`);
+    return top;
   }
 
   // ---------- วาดจากสถานะ ----------
@@ -186,16 +194,14 @@ export async function createBoard(root, hooks) {
     deck.style.setProperty('--depth', String(Math.min(3, Math.ceil(g.deckCount / 10))));
     const dir = g.dir === -1 ? -1 : 1;
     root.classList.toggle('rev', dir === -1);
-    drawOrbit(dir);
     if (g.discardTop) {
       discardImg.src = face[g.discardTop.kind];
       discardImg.style.setProperty('--tilt', `${tilt(g.discardTop.uid)}deg`);
       discardImg.hidden = false;
     } else discardImg.hidden = true;
     hand.hidden = handHidden;
-    renderHand(g.me && g.me.alive ? g.me.hand : [], selected || new Set());
-    // กองกลางอยู่กึ่งกลางระหว่างแถวที่นั่งกับมือ
-    root.style.setProperty('--seats-b', `${Math.round(seatsBox.getBoundingClientRect().bottom)}px`);
+    const handH = renderHand(g.me && g.me.alive ? g.me.hand : [], selected || new Set());
+    layoutMiddle(dir, handH);
   }
 
   // ---------- ภาพเคลื่อนไหว ----------
