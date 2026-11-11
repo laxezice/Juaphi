@@ -18,6 +18,21 @@ export const CARD_INFO = {
 
 export const KIND_ORDER = Object.keys(CARD_INFO);
 
+// จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
+const DECK = {
+  nope: [5, 10], sneak: [4, 8], curse: [3, 6], curse2: [1, 2], mirror: [5, 10], wind: [4, 8], beg: [4, 8],
+  imp1: [4, 8], imp2: [4, 8], imp3: [4, 8], imp4: [4, 8], imp5: [4, 8],
+};
+const SPARE_TALISMANS = [2, 3];
+
+/** มีการ์ดแบบนี้กี่ใบในเกมที่มี n คน (ผี = n − 1, ยันต์ = แจกคนละใบ + สำรองในกอง) */
+export function deckCount(kind, n) {
+  const col = n >= 6 ? 1 : 0;
+  if (kind === 'ghost') return n - 1;
+  if (kind === 'talisman') return n + SPARE_TALISMANS[col];
+  return DECK[kind] ? DECK[kind][col] : 0;
+}
+
 // ---------- วาดหน้าการ์ดลง canvas (ใช้เป็น texture ในฉาก 3 มิติ) ----------
 const GLYPH = { ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜' };
 export const CARD_W = 500;
@@ -84,8 +99,21 @@ function waitFonts() {
   return fontsReady;
 }
 
-/** หน้าการ์ด: ภาพจาก public/cards/<kind>.png ถ้ามี ไม่มีก็ใช้สีพื้น แล้วเขียนชื่อกับคำอธิบายทับแถบล่าง */
-export async function drawCardFace(kind) {
+const faceCache = new Map();
+const urlCache = new Map();
+/** หน้าการ์ด (canvas) วาดครั้งเดียวต่อแบบ ใช้ร่วมกันทั้งฉาก 3 มิติและหน้าจอ HTML */
+export function drawCardFace(kind) {
+  if (!faceCache.has(kind)) faceCache.set(kind, paintCardFace(kind));
+  return faceCache.get(kind);
+}
+/** หน้าการ์ดเป็นรูปสำหรับ <img> (แถวเลือกการ์ด รายการการ์ด) */
+export function cardFaceUrl(kind) {
+  if (!urlCache.has(kind)) urlCache.set(kind, drawCardFace(kind).then((c) => c.toDataURL('image/webp', 0.88)));
+  return urlCache.get(kind);
+}
+
+/** หน้าการ์ด: ภาพจาก public/cards/<kind> ถ้ามี ไม่มีก็ใช้สีพื้น แล้วเขียนชื่อกับคำอธิบายทับแถบบนและล่าง */
+async function paintCardFace(kind) {
   await waitFonts();
   const info = CARD_INFO[kind];
   const c = document.createElement('canvas');
@@ -122,22 +150,24 @@ export async function drawCardFace(kind) {
     ctx.textBaseline = 'middle';
     ctx.fillText(GLYPH[kind] || info.name.slice(0, 1), CARD_W / 2, 255);
   }
-  // แถบล่าง
-  const band = ctx.createLinearGradient(0, CARD_H * 0.62, 0, CARD_H);
+  // แถบล่างกับแถบบน: เงาจางๆ ให้ภาพยังเห็นชัด ตัวหนังสืออ่านออกด้วยเงาของตัวอักษรเอง
+  const band = ctx.createLinearGradient(0, CARD_H * 0.66, 0, CARD_H);
   band.addColorStop(0, 'rgba(10,8,16,0)');
-  band.addColorStop(0.25, 'rgba(10,8,16,0.85)');
-  band.addColorStop(1, 'rgba(10,8,16,0.95)');
+  band.addColorStop(0.35, 'rgba(10,8,16,0.45)');
+  band.addColorStop(1, 'rgba(10,8,16,0.62)');
   ctx.fillStyle = band;
-  ctx.fillRect(0, CARD_H * 0.62, CARD_W, CARD_H * 0.38);
-  // แถบชื่อด้านบน อ่านได้แม้การ์ดซ้อนกันในมือ
-  const topBand = ctx.createLinearGradient(0, 0, 0, 120);
-  topBand.addColorStop(0, 'rgba(10,8,16,0.92)');
-  topBand.addColorStop(0.7, 'rgba(10,8,16,0.75)');
+  ctx.fillRect(0, CARD_H * 0.66, CARD_W, CARD_H * 0.34);
+  const topBand = ctx.createLinearGradient(0, 0, 0, 110);
+  topBand.addColorStop(0, 'rgba(10,8,16,0.5)');
+  topBand.addColorStop(0.6, 'rgba(10,8,16,0.3)');
   topBand.addColorStop(1, 'rgba(10,8,16,0)');
   ctx.fillStyle = topBand;
-  ctx.fillRect(0, 0, CARD_W, 120);
+  ctx.fillRect(0, 0, CARD_W, 110);
   ctx.fillStyle = info.color;
   ctx.fillRect(0, 0, 16, 92);
+  ctx.shadowColor = 'rgba(0,0,0,0.95)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 2;
   ctx.fillStyle = '#ffe9b8';
   ctx.font = '600 62px Mitr, sans-serif';
   ctx.textAlign = 'left';
@@ -145,6 +175,10 @@ export async function drawCardFace(kind) {
   ctx.fillText(info.name, 34, 72);
   ctx.restore();
 
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.95)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 2;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#ffe9b8';
@@ -153,6 +187,7 @@ export async function drawCardFace(kind) {
   ctx.fillStyle = 'rgba(241,233,218,0.92)';
   ctx.font = '400 30px Sarabun, sans-serif';
   wrapThai(ctx, info.text, CARD_W - 70).slice(0, 3).forEach((l, i) => ctx.fillText(l, CARD_W / 2, CARD_H * 0.84 + i * 36));
+  ctx.restore();
 
   ctx.lineWidth = 10;
   ctx.strokeStyle = info.color;

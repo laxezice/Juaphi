@@ -16,7 +16,8 @@
     "/ui.js": "/ui.js?v=__V__",
     "/net.js": "/net.js?v=__V__",
     "/cards.js": "/cards.js?v=__V__",
-    "/scene.js": "/scene.js?v=__V__"
+    "/scene.js": "/scene.js?v=__V__",
+    "/tray.js": "/tray.js?v=__V__"
   } }</script>
 </head>
 <body>
@@ -54,7 +55,11 @@
   <section id="game" class="screen" hidden>
     <header class="hud">
       <div id="turn" class="turn"></div>
-      <button id="menu-btn" class="btn ghost small" aria-haspopup="true">เมนู</button>
+      <div class="hud-btns">
+        <button id="cards-btn" class="btn ghost small">การ์ด</button>
+        <button id="combo-btn" class="btn ghost small">คอมโบ</button>
+        <button id="menu-btn" class="btn ghost small" aria-haspopup="true">เมนู</button>
+      </div>
     </header>
     <div id="menu" class="menu" hidden>
       <div id="menu-players"></div>
@@ -88,6 +93,29 @@
       <div id="modal-body"></div>
       <button id="modal-cancel" class="btn ghost small">ยกเลิก</button>
     </div>
+  </div>
+
+  <!-- แถวเลือกการ์ดแบบเห็นภาพ (tray.js) -->
+  <div id="tray-layer" class="tray-layer" hidden>
+    <div class="info-banner">
+      <span id="tray-tag" class="info-tag">เลือกการ์ด</span>
+      <div id="tray-title" class="info-text"></div>
+      <div id="tray-detail" class="info-detail"></div>
+    </div>
+    <div id="tray-cards" class="tray"></div>
+    <div class="tray-bar">
+      <button id="tray-cancel" class="btn ghost small">ยกเลิก</button>
+      <button id="tray-ok" class="btn primary small">ยืนยัน</button>
+    </div>
+  </div>
+
+  <!-- แผงเต็มจอ: รายการการ์ด / คอมโบ -->
+  <div id="panel" class="panel" hidden>
+    <header class="panel-head">
+      <div id="panel-title" class="title"></div>
+      <button id="panel-close" class="btn ghost small">ปิด</button>
+    </header>
+    <div id="panel-body"></div>
   </div>
 
   <div id="toast" class="toast" hidden></div>

@@ -1,6 +1,7 @@
 // หน้าจอทั้งหมดที่เป็น HTML: หน้าแรก ห้องรอ ปุ่มในเกม กล่องเลือก และบันทึกเหตุการณ์
 import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
-import { CARD_INFO, KIND_ORDER, describeSelection } from './cards.js';
+import { CARD_INFO, KIND_ORDER, describeSelection, deckCount } from './cards.js';
+import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
 
 const $ = (id) => document.getElementById(id);
 const NOPE_MS = 3000;
@@ -136,10 +137,14 @@ function pickTarget(title) {
   return pr;
 }
 
-function pickName() {
-  return openModal('name', 'ทวงการ์ดอะไร?', (body, done) => {
-    for (const k of KIND_ORDER) body.append(chip(cardName(k), () => done(k)));
-  }, { grid: true });
+function pickName(target) {
+  return openTray({
+    key: 'name',
+    title: 'ทวงการ์ดอะไร?',
+    detail: `ถ้า ${nameOf(target)} มีการ์ดใบนี้ ต้องยกให้คุณ ถ้าไม่มีก็ไม่ได้อะไร`,
+    cards: KIND_ORDER.map((k) => ({ kind: k, key: k })),
+    confirm: (c) => `ทวง ${cardName(c.kind)}`,
+  });
 }
 
 // ---------- การเล่น ----------
@@ -172,7 +177,7 @@ async function playSelected() {
     if (!action.target) return;
   }
   if (sel.needName) {
-    action.name = await pickName();
+    action.name = await pickName(action.target);
     if (!action.name) return;
   }
   selected.clear();
@@ -180,11 +185,17 @@ async function playSelected() {
 }
 
 function showMirror(cards) {
-  openModal('mirror', 'ส่องกระจก: การ์ด 3 ใบบนกอง (ซ้าย = บนสุด)', (body) => {
-    if (!cards.length) body.append('กองว่าง');
-    for (const c of cards) body.append(cardFace(c.kind));
-    $('modal-cancel').textContent = 'ปิด';
-  }, { grid: true });
+  if (!cards.length) return toast('ส่องกระจก: กองว่าง');
+  openTray({
+    key: 'mirror',
+    tagText: 'ส่องกระจก',
+    title: `การ์ด ${cards.length} ใบบนกอง`,
+    detail: 'ซ้ายสุดคือใบที่จะถูกจั่วต่อไป เห็นแค่คุณคนเดียว',
+    cards: cards.map((c, i) => ({ kind: c.kind, key: i, tag: i === 0 ? 'บนสุด' : `ใบที่ ${i + 1}` })),
+    pick: 0,
+    confirm: 'จำไว้แล้ว',
+    cancel: null,
+  });
 }
 
 function openInsert(g) {
@@ -206,14 +217,15 @@ function openInsert(g) {
 }
 
 function openGive(g) {
-  openModal('give', `${nameOf(g.pending.to)} ขอการ์ด เลือกให้ 1 ใบ`, (body, done) => {
-    for (const c of g.me.hand) {
-      const f = cardFace(c.kind);
-      f.style.cursor = 'pointer';
-      f.onclick = () => done(c.uid);
-      body.append(f);
-    }
-  }, { grid: true, cancellable: false }).then((uid) => { if (uid) act({ type: 'give', uid }); });
+  openTray({
+    key: 'give',
+    tagText: 'ขอของ',
+    title: `${nameOf(g.pending.to)} ขอการ์ดจากคุณ`,
+    detail: 'เลือก 1 ใบจากมือที่จะยกให้',
+    cards: g.me.hand.map((c) => ({ kind: c.kind, key: c.uid })),
+    confirm: (c) => `ให้ ${cardName(c.kind)}`,
+    cancel: null,
+  }).then((uid) => { if (uid) act({ type: 'give', uid }); });
 }
 
 async function doGrudge() {
@@ -355,8 +367,11 @@ function renderGame(s) {
 
   // กล่องที่ต้องเปิดเอง
   if (pd && pd.kind === 'insert' && pd.player === you) { if (modalKey !== 'insert') openInsert(g); }
-  else if (pd && pd.kind === 'give' && pd.from === you) { if (modalKey !== 'give') openGive(g); }
-  else if (modalKey === 'insert' || modalKey === 'give') closeModal();
+  else if (modalKey === 'insert') closeModal();
+  if (pd && pd.kind === 'give' && pd.from === you) { if (trayKey() !== 'give') openGive(g); }
+  else if (trayKey() === 'give') closeTray();
+  // ทวงการ์ดค้างอยู่แต่มีเรื่องแทรกหรือหมดตา ปิดแถว
+  if (trayKey() === 'name' && (pd || g.winner || !mine)) closeTray();
   // กำลังเลือกเป้าหมายอยู่แต่สถานการณ์เปลี่ยน (มีเรื่องแทรก หรือหมดตาเรา) ปิดกล่อง
   if (modalKey === 'target' && (pd || g.winner || (me && me.alive && !mine))) closeModal();
 
@@ -387,10 +402,80 @@ function renderGame(s) {
 
 export function render() {
   const s = S();
+  if (!s || !s.game) closeTray();
   if (!s) renderHome();
   else if (!s.game) renderLobby(s);
   else renderGame(s);
   if (scene) scene.setState(s && s.game ? s : null, selected);
+}
+
+// ---------- แผงดูการ์ดและคอมโบ ----------
+const seatCount = () => {
+  const s = S();
+  return s ? (s.game ? s.game.players.length : s.room.players.length) : 4;
+};
+
+function openCardList() {
+  const n = Math.max(2, seatCount());
+  const hand = handCards();
+  openPanel(`การ์ดทั้งหมด (เกม ${n} คน)`, (body) => {
+    const grid = document.createElement('div');
+    grid.className = 'card-grid';
+    for (const k of KIND_ORDER) {
+      const item = document.createElement('div');
+      item.className = 'card-item';
+      const mine = hand.filter((c) => c.kind === k).length;
+      const info = document.createElement('div');
+      info.className = 'card-info';
+      info.innerHTML = `<b>${esc(cardName(k))}</b><span>${esc(CARD_INFO[k].text)}</span>`
+        + `<small>ในเกม ${deckCount(k, n)} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
+      item.append(cardEl(k), info);
+      grid.append(item);
+    }
+    body.append(grid);
+  });
+}
+
+function comboRow(kinds, title, text) {
+  const row = document.createElement('div');
+  row.className = 'combo';
+  const pics = document.createElement('div');
+  pics.className = 'combo-cards';
+  for (const k of kinds) pics.append(cardEl(k));
+  const t = document.createElement('div');
+  t.className = 'combo-text';
+  t.innerHTML = `<b>${esc(title)}</b><span>${esc(text)}</span>`;
+  row.append(pics, t);
+  return row;
+}
+
+function openCombos() {
+  const hand = handCards();
+  openPanel('คอมโบ', (body) => {
+    // คอมโบที่ทำได้ตอนนี้จากการ์ดในมือ
+    const ready = KIND_ORDER.filter((k) => CARD_INFO[k].imp && hand.filter((c) => c.kind === k).length >= 2);
+    if (ready.length) {
+      const h = document.createElement('h3');
+      h.textContent = 'ในมือคุณตอนนี้';
+      body.append(h);
+      for (const k of ready) {
+        const n = hand.filter((c) => c.kind === k).length;
+        body.append(comboRow(Array(Math.min(3, n)).fill(k), `${cardName(k)} ×${n}`,
+          n >= 3 ? 'เล่นสามใบเพื่อทวงการ์ดที่ระบุ หรือเล่นแค่คู่เพื่อขโมยแบบสุ่ม' : 'เล่นคู่นี้เพื่อขโมยการ์ดเพื่อนแบบสุ่ม 1 ใบ'));
+      }
+    }
+    const h = document.createElement('h3');
+    h.textContent = 'คอมโบทั้งหมด';
+    body.append(h);
+    body.append(
+      comboRow(['imp4', 'imp4'], 'ผีน้อยคู่ (แบบเดียวกัน)', 'เลือกเพื่อน 1 คน แล้วสุ่มขโมยการ์ดในมือเขา 1 ใบ'),
+      comboRow(['imp2', 'imp2', 'imp2'], 'ผีน้อยสามใบ (แบบเดียวกัน)', 'เลือกเพื่อนแล้วระบุชื่อการ์ด ถ้าเขามีต้องยกให้คุณ ถ้าไม่มีก็ไม่ได้อะไร'),
+      comboRow(['nope', 'nope'], 'ไม่! ซ้อน ไม่!', '"ไม่!" ใบที่สองยกเลิกใบแรก การ์ดที่ถูกยกเลิกจะกลับมามีผล นับเลขคี่ = ยกเลิก'),
+      comboRow(['curse', 'curse2'], 'สาปส่งต่อ', 'โดนสาปแล้วสาปต่อ ตาที่ค้างทั้งหมดทบไปให้คนถัดไป บวกอีก 2 หรือ 3 ตา'),
+      comboRow(['mirror', 'sneak'], 'เคล็ดลับ: ส่องกระจกแล้วหนี', 'ส่องเห็นผีอยู่บนสุด ใช้ย่องหนีหรือสาปส่งจบตาโดยไม่ต้องจั่ว'),
+      comboRow(['mirror', 'wind'], 'เคล็ดลับ: ส่องกระจกแล้วสับ', 'เห็นผีบนกองแต่ไม่มีทางหนี ใช้ลมพัดสับกองเสี่ยงดวงใหม่'),
+    );
+  });
 }
 
 // ---------- เริ่มต้น ----------
@@ -410,6 +495,11 @@ export function initUI() {
   $('lobby-leave').onclick = () => leaveRoom();
   $('game-leave').onclick = () => { if (confirm('ออกจากห้อง? ถ้าเกมกำลังเล่นอยู่ คุณจะตกรอบ')) { $('menu').hidden = true; leaveRoom(); } };
   $('menu-btn').onclick = () => { $('menu').hidden = !$('menu').hidden; };
+  $('cards-btn').onclick = () => { $('menu').hidden = true; openCardList(); };
+  $('combo-btn').onclick = () => { $('menu').hidden = true; openCombos(); };
+  $('panel-close').onclick = () => closePanel();
+  // แถวเลือกการ์ดเปิด ซ่อนการ์ดในมือบนโต๊ะ จะได้ไม่ซ้อนกัน
+  onTrayChange((open) => { if (scene && scene.setHandHidden) scene.setHandHidden(open); });
   $('invite').onclick = async () => {
     const url = `${location.origin}/?room=${S().room.code}`;
     try { await navigator.clipboard.writeText(url); toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนใน Discord ได้เลย'); }

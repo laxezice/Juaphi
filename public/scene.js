@@ -255,7 +255,7 @@ export async function createScene(canvas, hooks) {
   const handCards = new Map();   // uid -> mesh
   let handLayout = { k: 0.01, cardPx: 140, hh: 1 };
   const HAND_D = 2.2;
-  const handMat = (k) => new THREE.MeshBasicMaterial({ map: tex[k], transparent: true, depthTest: false });
+  const handMat = (k) => new THREE.MeshBasicMaterial({ map: tex[k], transparent: true, depthTest: false, toneMapped: false });   // ไม่ปรับโทน สีขาวของการ์ดจะขาวจริง
   const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffc85a, transparent: true, depthTest: false });
 
   function layoutHand(cards, selected, instant) {
@@ -497,6 +497,7 @@ export async function createScene(canvas, hooks) {
 
   // ---------- วาดจากสถานะ ----------
   let lastSel = new Set();
+  let handHidden = false;
   function apply(s, selected, instant) {
     last = s;
     lastSel = selected || new Set();
@@ -505,7 +506,7 @@ export async function createScene(canvas, hooks) {
     deckStack.visible = inGame && g.deckCount > 0;
     deckLabel.sprite.visible = inGame;
     discardCard.visible = inGame && !!g.discardTop;
-    hand.visible = inGame;
+    hand.visible = inGame && !handHidden;
     if (!inGame) {
       for (const [, st] of seats) scene.remove(st.group);
       seats.clear();
@@ -575,6 +576,8 @@ export async function createScene(canvas, hooks) {
 
   return {
     setState(s, selected) { apply(s, selected, false); },
+    /** แถวเลือกการ์ด (HTML) เปิดอยู่ ซ่อนการ์ดในมือบนโต๊ะ */
+    setHandHidden(v) { handHidden = v; hand.visible = !!(last && last.game) && !v; },
     playEvent(e, s) { queue = queue.then(() => animate(e, s)).catch((err) => console.warn(err)); },
     debug: { scene, camera, renderer, seats, handCards },
   };
