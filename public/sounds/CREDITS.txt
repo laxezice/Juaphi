@@ -3,3 +3,7 @@ http://creativecommons.org/publicdomain/zero/1.0/
 
 shuffle.mp3 = card-shuffle.ogg (แปลงเป็น MP3 ให้ Safari เล่นได้)
 card.mp3, draw.mp3 = card-place-1.ogg
+
+ghost.mp3 = "Scary Female Halloween Horror Laughter Vol 006" by alesiadavina (Pixabay, id 165223)
+           Pixabay Content License https://pixabay.com/service/license-summary/
+           ตัดความเงียบท้ายและใส่ fade out แล้ว ใช้เป็นเสียงประกอบในเกมเท่านั้น

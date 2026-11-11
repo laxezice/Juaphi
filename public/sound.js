@@ -49,6 +49,7 @@ const TUNE = {
   shuffle: { rate: 2, gain: 1 },
   card: { rate: 1.25, gain: 0.6 },
   draw: { rate: 1.25, gain: 0.6 },
+  ghost: { rate: 1.25, gain: 0.5 },
 };
 
 /** เล่นเสียง delay = วินาทีที่รอก่อนเล่น */
