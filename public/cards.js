@@ -150,29 +150,43 @@ async function paintCardFace(kind) {
     ctx.textBaseline = 'middle';
     ctx.fillText(GLYPH[kind] || info.name.slice(0, 1), CARD_W / 2, 255);
   }
+  // ผีเป็นการ์ดอันตราย ตัวหนังสือสีแดงทั้งใบ
+  const ink = kind === 'ghost' ? { name: '#ff3b3b', text: '#ff9a9a' } : { name: '#ffe9b8', text: 'rgba(241,233,218,0.92)' };
   // แถบล่างกับแถบบน: เงาจางๆ ให้ภาพยังเห็นชัด ตัวหนังสืออ่านออกด้วยเงาของตัวอักษรเอง
-  const band = ctx.createLinearGradient(0, CARD_H * 0.66, 0, CARD_H);
+  const band = ctx.createLinearGradient(0, CARD_H * 0.74, 0, CARD_H);
   band.addColorStop(0, 'rgba(10,8,16,0)');
   band.addColorStop(0.35, 'rgba(10,8,16,0.45)');
   band.addColorStop(1, 'rgba(10,8,16,0.62)');
   ctx.fillStyle = band;
-  ctx.fillRect(0, CARD_H * 0.66, CARD_W, CARD_H * 0.34);
+  ctx.fillRect(0, CARD_H * 0.74, CARD_W, CARD_H * 0.26);
   const topBand = ctx.createLinearGradient(0, 0, 0, 110);
   topBand.addColorStop(0, 'rgba(10,8,16,0.5)');
   topBand.addColorStop(0.6, 'rgba(10,8,16,0.3)');
   topBand.addColorStop(1, 'rgba(10,8,16,0)');
   ctx.fillStyle = topBand;
   ctx.fillRect(0, 0, CARD_W, 110);
-  ctx.fillStyle = info.color;
-  ctx.fillRect(0, 0, 16, 92);
+  // ประเภทการ์ด: ไอคอนหน้าชื่อ (เห็นเสมอแม้การ์ดในมือซ้อนกัน) ผีน้อยมีป้าย "คอมโบ" มุมขวาบนด้วย
+  const type = cardType(kind);
+  let nameX = 34;
+  if (type) {
+    drawTypeIcon(ctx, type, 46, 52, info.color);
+    nameX = 84;
+  } else {
+    ctx.fillStyle = info.color;
+    ctx.fillRect(0, 0, 16, 92);
+  }
+  let nameMax = CARD_W - nameX - 24;
+  if (type === 'combo') nameMax = drawComboRibbon(ctx) - nameX - 14;
   ctx.shadowColor = 'rgba(0,0,0,0.95)';
   ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 2;
-  ctx.fillStyle = '#ffe9b8';
-  ctx.font = '600 62px Mitr, sans-serif';
+  ctx.fillStyle = ink.name;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(info.name, 34, 72);
+  let size = 62;
+  ctx.font = `600 ${size}px Mitr, sans-serif`;
+  while (size > 40 && ctx.measureText(info.name).width > nameMax) ctx.font = `600 ${(size -= 2)}px Mitr, sans-serif`;
+  ctx.fillText(info.name, nameX, 72);
   ctx.restore();
 
   ctx.save();
@@ -181,19 +195,102 @@ async function paintCardFace(kind) {
   ctx.shadowOffsetY = 2;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#ffe9b8';
-  ctx.font = '600 58px Mitr, sans-serif';
-  ctx.fillText(info.imp ? `ผีน้อย ${info.name}` : info.name, CARD_W / 2, CARD_H * 0.76);
-  ctx.fillStyle = 'rgba(241,233,218,0.92)';
-  ctx.font = '400 30px Sarabun, sans-serif';
-  wrapThai(ctx, info.text, CARD_W - 70).slice(0, 3).forEach((l, i) => ctx.fillText(l, CARD_W / 2, CARD_H * 0.84 + i * 36));
+  // ชื่อกับคำอธิบายชิดล่างของการ์ด ภาพตรงกลางเห็นได้มากที่สุด
+  ctx.fillStyle = ink.name;
+  ctx.font = '600 56px Mitr, sans-serif';
+  ctx.fillText(info.imp ? `ผีน้อย ${info.name}` : info.name, CARD_W / 2, CARD_H * 0.835);
+  ctx.fillStyle = ink.text;
+  ctx.font = '400 29px Sarabun, sans-serif';
+  wrapThai(ctx, info.text, CARD_W - 70).slice(0, 2).forEach((l, i) => ctx.fillText(l, CARD_W / 2, CARD_H * 0.895 + i * 33));
   ctx.restore();
 
+  if (type === 'combo') drawGoldFrame(ctx);
+  else {
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = info.color;
+    roundRect(ctx, 5, 5, CARD_W - 10, CARD_H - 10, 32);
+    ctx.stroke();
+  }
+  return c;
+}
+
+// ---------- ป้ายบอกประเภทการ์ด ----------
+const ACTIONS = new Set(['nope', 'sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg']);
+const GOLD = '#e6b04d';
+/** 'action' = การ์ดที่เล่นได้เอง, 'combo' = ผีน้อย (ต้องเล่นเป็นชุด), null = ผีกับยันต์ (เล่นเองไม่ได้) */
+export function cardType(kind) {
+  if (CARD_INFO[kind]?.imp) return 'combo';
+  return ACTIONS.has(kind) ? 'action' : null;
+}
+
+/** วงกลมเข้มพร้อมสายฟ้า (แอ็กชัน) หรือโซ่ (คอมโบ) */
+function drawTypeIcon(ctx, type, cx, cy, color) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(14,10,22,0.88)';
+  ctx.fill();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = type === 'combo' ? GOLD : color;
+  ctx.stroke();
+  if (type === 'action') {
+    const p = [[4, -19], [-12, 3], [-1, 3], [-5, 19], [12, -5], [1, -5]];
+    ctx.beginPath();
+    p.forEach(([x, y], i) => (i ? ctx.lineTo(cx + x, cy + y) : ctx.moveTo(cx + x, cy + y)));
+    ctx.closePath();
+    ctx.fillStyle = '#ffd54a';
+    ctx.fill();
+  } else {
+    // ข้อโซ่สองห่วงไขว้กัน
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = GOLD;
+    for (const [dx, dy] of [[-6, 6], [6, -6]]) {
+      ctx.save();
+      ctx.translate(cx + dx, cy + dy);
+      ctx.rotate(-Math.PI / 4);
+      roundRect(ctx, -13, -7, 26, 14, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+/** ป้าย "คอมโบ" มุมขวาบน คืนตำแหน่ง x ด้านซ้ายของป้าย (ไว้กันชื่อการ์ดไม่ให้ชน) */
+function drawComboRibbon(ctx) {
+  ctx.save();
+  ctx.font = '600 28px Mitr, sans-serif';
+  const label = 'คอมโบ ×2 ×3';
+  const w = ctx.measureText(label).width + 28;
+  const x = CARD_W - 22 - w;
+  roundRect(ctx, x, 30, w, 44, 22);
+  ctx.fillStyle = GOLD;
+  ctx.fill();
+  ctx.fillStyle = '#2a1a00';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, 54);
+  ctx.restore();
+  return x;
+}
+
+/** กรอบทองสองชั้นมีลายจุด สำหรับผีน้อย */
+function drawGoldFrame(ctx) {
+  ctx.save();
+  ctx.strokeStyle = GOLD;
   ctx.lineWidth = 10;
-  ctx.strokeStyle = info.color;
   roundRect(ctx, 5, 5, CARD_W - 10, CARD_H - 10, 32);
   ctx.stroke();
-  return c;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(230,176,77,0.9)';
+  roundRect(ctx, 18, 18, CARD_W - 36, CARD_H - 36, 22);
+  ctx.stroke();
+  // จุดทองระหว่างกรอบสองชั้น
+  ctx.fillStyle = GOLD;
+  const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fill(); };
+  for (let x = 46; x <= CARD_W - 46; x += 26) { dot(x, 13.2); dot(x, CARD_H - 13.2); }
+  for (let y = 46; y <= CARD_H - 46; y += 26) { dot(13.2, y); dot(CARD_W - 13.2, y); }
+  ctx.restore();
 }
 
 /** หลังการ์ด: public/cards/back.png ถ้ามี ไม่มีก็วาดลายยันต์ */
