@@ -307,6 +307,74 @@ function renderHand(g) {
   }
 }
 
+// ---------- ลำดับการโต้ตอบระหว่างช่วงกด "ไม่!" ----------
+let chain = null;      // { actor, kinds, target, name, nopes: [playerId|null], result: null | 'cancelled' | 'done' }
+let chainTimer = null;
+
+function chainEvent(e) {
+  if (e.type === 'play') {
+    clearTimeout(chainTimer);
+    chain = { actor: e.player, kinds: e.kinds, target: e.target, name: e.name, nopes: [], result: null };
+  } else if (e.type === 'nope' && chain && !chain.result) chain.nopes.push(e.player);
+  else if (e.type === 'resolve' && chain && !chain.result) {
+    // โชว์ผลค้างไว้สักครู่ก่อนหาย
+    chain.result = e.cancelled ? 'cancelled' : 'done';
+    clearTimeout(chainTimer);
+    chainTimer = setTimeout(() => { chain = null; renderChain(); }, 1800);
+  } else return;
+  renderChain(true);
+}
+
+/** fromEvent: เรียกจากอีเวนต์ซึ่งมาถึงก่อนสถานะเกมใหม่ ยังไม่ต้องเทียบกับสถานะ */
+function renderChain(fromEvent = false) {
+  const g = G();
+  const pd = g && g.pending;
+  // เข้ามากลางทาง (รีเฟรชหน้า) สร้างจากสถานะเกม ไม่รู้ว่าใครกด ไม่! บ้าง
+  if (!chain && pd && pd.kind === 'window') {
+    chain = { actor: pd.actor, kinds: pd.kinds, target: pd.target, name: pd.name, nopes: Array(pd.nopeCount).fill(null), result: null };
+  }
+  // สถานะบอกว่าไม่มีช่วงกด ไม่! แล้วแต่เราไม่ได้รับผลตัดสิน (เช่น คนเล่นออกจากห้อง) ล้างทิ้ง
+  if (!fromEvent && chain && !chain.result && !(pd && pd.kind === 'window')) chain = null;
+  const box = $('chain');
+  box.hidden = !chain || !g;
+  document.body.classList.toggle('chain-open', !box.hidden);
+  if (box.hidden) return;
+
+  const n = chain.nopes.length;
+  // นับจากใบล่าสุดย้อนกลับ: ใบล่าสุดมีผล ใบก่อนหน้าถูกยกเลิก สลับกันไป
+  const live = (pos) => (n - pos) % 2 === 0;   // pos 0 = ใบที่เล่น, 1.. = ไม่! ใบที่ 1..
+  const row = $('chain-cards');
+  row.innerHTML = '';
+  const group = document.createElement('div');
+  group.className = 'chain-play';
+  chain.kinds.forEach((k, j) => {
+    const el = cardEl(k, j === 0 ? { tag: nameOf(chain.actor) } : {});
+    if (!live(0)) el.classList.add('cancelled');
+    group.append(el);
+  });
+  row.append(group);
+  chain.nopes.forEach((p, i) => {
+    const arrow = document.createElement('span');
+    arrow.className = 'chain-arrow';
+    arrow.textContent = '◀';
+    const el = cardEl('nope', { tag: p ? nameOf(p) : 'ไม่!' });
+    if (!live(i + 1)) el.classList.add('cancelled');
+    row.append(arrow, el);
+  });
+
+  const cname = chain.kinds.length > 1 ? `ผีน้อย${CARD_INFO[chain.kinds[0]].name} ${chain.kinds.length} ใบ` : cardName(chain.kinds[0]);
+  const target = chain.target ? ` ใส่ ${nameOf(chain.target)}` : '';
+  let text;
+  let tone = '';
+  if (chain.result === 'cancelled') { text = `${cname} ถูกยกเลิก`; tone = 'bad'; }
+  else if (chain.result === 'done') { text = `${cname} มีผล${target}`; tone = 'good'; }
+  else if (n === 0) text = `${nameOf(chain.actor)} เล่น ${cname}${target}`;
+  else if (n % 2) { text = `ตอนนี้: ${cname} จะถูกยกเลิก`; tone = 'bad'; }
+  else { text = `ตอนนี้: ${cname} จะมีผล${target}`; tone = 'good'; }
+  $('chain-status').textContent = text;
+  $('chain-status').className = `chain-status ${tone}`.trim();
+}
+
 function renderGame(s) {
   showScreen('game');
   const g = s.game;
@@ -398,11 +466,12 @@ function renderGame(s) {
   if (s.room.hostId === you && g.winner && s.room.players.length < MAX_SEATS) mp.append(chip('เพิ่มบอต', () => send({ t: 'addBot' })));
 
   renderHand(g);
+  renderChain();
 }
 
 export function render() {
   const s = S();
-  if (!s || !s.game) closeTray();
+  if (!s || !s.game) { closeTray(); chain = null; renderChain(); }
   if (!s) renderHome();
   else if (!s.game) renderLobby(s);
   else renderGame(s);
@@ -537,6 +606,7 @@ export function initUI() {
     const you = s ? s.you : null;
     const text = describe(e, you, nameOf);
     if (text) log(text);
+    chainEvent(e);
     if (e.type === 'mirror' && e.player === you && e.cards) showMirror(e.cards);
     if (scene) scene.playEvent(e, S());
   });

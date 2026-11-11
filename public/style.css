@@ -216,3 +216,43 @@ body.tray-open .actions, body.tray-open #hand, body.tray-open .log { visibility:
 .actions .row .btn.nope { background-image: var(--btn-nope); width: 124px; height: 124px; font-size: 34px; }
 .actions .row .btn.draw:hover { transform: scale(1.05); }
 .actions .row .btn.draw:active, .actions .row .btn.nope:active { transform: scale(0.94); }
+
+/* ---------- ลำดับการโต้ตอบ (ใบที่เล่น ◀ ไม่! ◀ ไม่!) กลางจอด้านบน ---------- */
+.chain {
+  position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: calc(100% - 24px);
+  padding: 10px 12px 8px; background: rgba(10, 16, 32, 0.86); border: 2px solid var(--gold); border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6); pointer-events: none; animation: chain-in 0.18s ease-out;
+}
+@keyframes chain-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+.chain-cards { display: flex; align-items: center; justify-content: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.chain .tcard { --tray-h: 118px; animation: tray-in 0.2s ease-out backwards; }
+@media (max-width: 760px) { .chain .tcard { --tray-h: 84px; } .chain { top: 76px; } }
+.chain-play { display: flex; flex: none; }
+.chain-play .tcard + .tcard { margin-left: -40px; }
+.chain-arrow { flex: none; color: #ff7a6e; font-size: 16px; text-shadow: 0 0 6px rgba(255, 90, 70, 0.8); }
+.chain .tcard .ttag { font-size: 12px; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.chain .tcard.cancelled > img { filter: grayscale(0.7) brightness(0.55); }
+.chain .tcard.cancelled::after {
+  content: '✕'; position: absolute; inset: 0; display: grid; place-items: center;
+  font: 600 56px/1 'Mitr', sans-serif; color: #ff5a4e; text-shadow: 0 0 8px #000, 0 2px 0 #000;
+}
+.chain-status { margin-top: 6px; text-align: center; font: 600 15px 'Mitr', sans-serif; color: #fff3d6; }
+.chain-status.bad { color: #ff9b90; }
+.chain-status.good { color: #a6f0b0; }
+body.chain-open .log, body.tray-open .chain { visibility: hidden; }
+
+/* ---------- แสงเรืองรอบปุ่มจั่ว (ทอง) กับปุ่ม ไม่! (แดง) บอกว่ากดได้ ---------- */
+.actions .row .btn.draw, .actions .row .btn.nope { position: relative; isolation: isolate; }
+.actions .row .btn.draw::before, .actions .row .btn.nope::before {
+  content: ''; position: absolute; inset: -16px; z-index: -1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 214, 90, 0.75) 0%, rgba(255, 190, 60, 0.35) 45%, rgba(255, 190, 60, 0) 70%);
+  animation: btn-halo 1.2s ease-in-out infinite alternate;
+}
+.actions .row .btn.nope::before {
+  background: radial-gradient(circle, rgba(255, 90, 70, 0.85) 0%, rgba(240, 60, 50, 0.4) 45%, rgba(240, 60, 50, 0) 70%);
+  animation-duration: 0.6s;
+}
+.actions .row .btn.draw { filter: drop-shadow(0 0 8px rgba(255, 205, 80, 0.9)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55)); }
+.actions .row .btn.nope { filter: drop-shadow(0 0 10px rgba(255, 80, 60, 0.95)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55)); }
+@keyframes btn-halo { from { opacity: 0.55; transform: scale(0.9); } to { opacity: 1; transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .actions .row .btn.draw::before, .actions .row .btn.nope::before { animation: none; } }

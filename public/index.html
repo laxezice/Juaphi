@@ -67,6 +67,11 @@
       <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
     </div>
     <div id="log" class="log" aria-live="polite"></div>
+    <!-- ลำดับการโต้ตอบระหว่างช่วงกด "ไม่!": ใบที่เล่น แล้วตามด้วย ไม่! ทีละใบ -->
+    <div id="chain" class="chain" hidden>
+      <div id="chain-cards" class="chain-cards"></div>
+      <div id="chain-status" class="chain-status"></div>
+    </div>
     <div id="hand" class="hand" hidden></div>
     <footer class="actions">
       <div id="prompt" class="prompt"></div>

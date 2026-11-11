@@ -255,7 +255,23 @@ export async function createScene(canvas, hooks) {
   let handLayout = { k: 0.01, cardPx: 140, hh: 1 };
   const HAND_D = 2.2;
   const handMat = (k) => new THREE.MeshBasicMaterial({ map: tex[k], transparent: true, depthTest: false, toneMapped: false });   // ไม่ปรับโทน สีขาวของการ์ดจะขาวจริง
-  const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffc85a, transparent: true, depthTest: false });
+  // แสงเรืองทองรอบการ์ดที่เลือก: วาดเป็นภาพขอบนุ่ม มุมโค้งตามการ์ด (ไม่ใช่สี่เหลี่ยมทึบ)
+  const GLOW_PAD = 64;
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = 500 + GLOW_PAD * 2;
+  glowCanvas.height = 700 + GLOW_PAD * 2;
+  {
+    const ctx = glowCanvas.getContext('2d');
+    const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    ctx.shadowColor = 'rgba(255, 205, 80, 1)';
+    for (const [blur, a] of [[48, 0.9], [22, 1]]) {
+      ctx.shadowBlur = blur;
+      ctx.fillStyle = `rgba(255, 214, 102, ${a})`;
+      rr(GLOW_PAD - 6, GLOW_PAD - 6, 512, 712, 42);
+      ctx.fill();
+    }
+  }
+  const outlineMat = new THREE.MeshBasicMaterial({ map: toTex(glowCanvas), transparent: true, depthTest: false, toneMapped: false });
 
   function layoutHand(cards, selected, instant) {
     const W = renderer.domElement.clientWidth;
@@ -286,7 +302,7 @@ export async function createScene(canvas, hooks) {
         m.position.set(0, baseY - cardPx * k, -HAND_D);
         // กรอบทองตอนเลือก
         const outline = new THREE.Mesh(planeGeo, outlineMat);
-        outline.scale.set(1.09, 1.065, 1);
+        outline.scale.set((500 + GLOW_PAD * 2) / 500, (700 + GLOW_PAD * 2) / 700, 1);
         outline.position.z = -0.0005;
         outline.raycast = () => {};
         m.add(outline);
