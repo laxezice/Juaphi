@@ -118,6 +118,20 @@ export async function drawCardFace(kind) {
   band.addColorStop(1, 'rgba(10,8,16,0.95)');
   ctx.fillStyle = band;
   ctx.fillRect(0, CARD_H * 0.62, CARD_W, CARD_H * 0.38);
+  // แถบชื่อด้านบน อ่านได้แม้การ์ดซ้อนกันในมือ
+  const topBand = ctx.createLinearGradient(0, 0, 0, 120);
+  topBand.addColorStop(0, 'rgba(10,8,16,0.92)');
+  topBand.addColorStop(0.7, 'rgba(10,8,16,0.75)');
+  topBand.addColorStop(1, 'rgba(10,8,16,0)');
+  ctx.fillStyle = topBand;
+  ctx.fillRect(0, 0, CARD_W, 120);
+  ctx.fillStyle = info.color;
+  ctx.fillRect(0, 0, 16, 92);
+  ctx.fillStyle = '#ffe9b8';
+  ctx.font = '600 62px Mitr, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(info.name, 34, 72);
   ctx.restore();
 
   ctx.textAlign = 'center';

@@ -383,8 +383,13 @@ export function render() {
 }
 
 // ---------- เริ่มต้น ----------
-export function initUI(sceneApi) {
-  scene = sceneApi;
+/** ฉาก 3 มิติโหลดเสร็จ เปลี่ยนจากการ์ด HTML เป็นการ์ดบนโต๊ะ */
+export function attachScene(api) {
+  scene = api;
+  render();
+}
+
+export function initUI() {
   $('name').value = net.name;
   $('create').onclick = () => { if (ensureName()) createRoom(); };
   $('name').onkeydown = (e) => { if (e.key === 'Enter') $('create').click(); };

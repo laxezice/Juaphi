@@ -1,11 +1,13 @@
-// จุดเริ่มของหน้าเว็บ: ลองเปิดฉาก 3 มิติ ถ้าเครื่องไม่รองรับ ใช้การ์ดแบบ HTML แทน
-import { initUI, sceneHooks } from './ui.js';
+// จุดเริ่มของหน้าเว็บ: เปิดหน้าจอ HTML ทันที แล้วค่อยโหลดฉาก 3 มิติ (ภาพการ์ดใหญ่ ใช้เวลาโหลด)
+// ระหว่างรอหรือถ้าเครื่องไม่รองรับ WebGL ใช้การ์ดแบบ HTML แทน
+import { initUI, attachScene, sceneHooks } from './ui.js';
 
-let sceneApi = null;
+initUI();
 try {
   const { createScene } = await import('./scene.js');
-  sceneApi = await createScene(document.getElementById('scene'), sceneHooks);
+  const api = await createScene(document.getElementById('scene'), sceneHooks);
+  window.__juaphi = api;   // ไว้ตรวจสอบจาก console
+  attachScene(api);
 } catch (err) {
   console.warn('3D scene unavailable, using HTML hand', err);
 }
-initUI(sceneApi);
