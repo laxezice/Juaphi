@@ -1,11 +1,14 @@
-// บอตสำหรับลองเล่นบนเครื่องตัวเอง: node tools/bot.js <รหัสห้อง> [ชื่อ] [พอร์ต]
+// บอตสำหรับลองเล่น: node tools/bot.js <รหัสห้อง> [ชื่อ] [พอร์ต หรือที่อยู่เว็บ]
+//   node tools/bot.js ABCD ผีบอต 3000
+//   node tools/bot.js ABCD ผีบอต https://juaphi.laxezice.win
 // เข้าห้องแล้วเล่นแบบสุ่มๆ (เล่นการ์ดบ้าง จั่วบ้าง กด "ไม่!" บ้าง)
 const { WebSocket } = require('ws');
 
-const [room, name = 'บอต' + Math.floor(Math.random() * 100), port = process.env.PORT || 3000] = process.argv.slice(2);
-if (!room) { console.log('ใช้: node tools/bot.js <รหัสห้อง> [ชื่อ] [พอร์ต]'); process.exit(1); }
+const [room, name = 'บอต' + Math.floor(Math.random() * 100), where = process.env.PORT || 3000] = process.argv.slice(2);
+if (!room) { console.log('ใช้: node tools/bot.js <รหัสห้อง> [ชื่อ] [พอร์ต หรือที่อยู่เว็บ]'); process.exit(1); }
 
-const ws = new WebSocket(`ws://localhost:${port}/ws`);
+const url = /^https?:\/\//.test(String(where)) ? String(where).replace(/^http/, 'ws').replace(/\/$/, '') + '/ws' : `ws://localhost:${where}/ws`;
+const ws = new WebSocket(url);
 const send = (m) => ws.send(JSON.stringify(m));
 const act = (action) => send({ t: 'act', action });
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
