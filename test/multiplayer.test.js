@@ -98,6 +98,24 @@ test('only the host can add a bot; bots are marked and can be kicked', async (t)
   await waitFor(() => a.state.room.players.length === 3);
 });
 
+test('kicking every bot mid-game ends it; the lone host can add a bot and start again', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
+  const [a] = await setupRoom(srv, ['A']);
+  a.send({ t: 'addBot' });
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.length === 3);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  for (const b of a.state.room.players.filter((p) => p.bot)) a.send({ t: 'kick', id: b.id });
+  await waitFor(() => a.state.room.players.length === 1 && a.state.game.winner === a.id);
+  a.send({ t: 'start' });
+  await waitFor(() => a.errors.length === 1);   // คนเดียวเริ่มไม่ได้
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.length === 2);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && !a.state.game.winner && a.state.game.players.length === 2);
+});
+
 test('one person can play a whole game against bots', { timeout: 30000 }, async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '15' });
   const a = await srv.client('A');

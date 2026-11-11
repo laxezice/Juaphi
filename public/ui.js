@@ -479,8 +479,13 @@ function renderGame(s) {
   if (g.winner) {
     $('winner-text').textContent = g.winner === you ? 'คุณรอดคนสุดท้าย ชนะ!' : `${nameOf(g.winner)} ชนะ!`;
     const isHost = s.room.hostId === you;
+    // เริ่มรอบใหม่ต้องมีคนออนไลน์อย่างน้อย 2 คน ถ้าเหลือคนเดียวให้เพิ่มบอตจากตรงนี้ได้เลย
+    const online = s.room.players.filter((p) => p.online).length;
     $('again').hidden = !isHost;
-    $('again-hint').textContent = isHost ? '' : 'รอหัวห้องเริ่มรอบใหม่';
+    $('again').disabled = online < 2;
+    $('again-bot').hidden = !isHost || s.room.players.length >= MAX_SEATS;
+    $('again-hint').textContent = !isHost ? 'รอหัวห้องเริ่มรอบใหม่'
+      : online < 2 ? 'เหลือคุณคนเดียว เพิ่มบอตหรือชวนเพื่อนเข้าห้องก่อนเริ่มรอบใหม่' : '';
   }
 
   // รายชื่อในเมนู
@@ -684,6 +689,7 @@ export function initUI() {
   $('start').onclick = () => send({ t: 'start' });
   $('add-bot').onclick = () => send({ t: 'addBot' });
   $('again').onclick = () => send({ t: 'start' });
+  $('again-bot').onclick = () => send({ t: 'addBot' });
   $('draw').onclick = () => { selected.clear(); act({ type: 'draw' }); };
   $('play').onclick = () => playSelected();
   $('nope').onclick = () => {
