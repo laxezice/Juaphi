@@ -20,11 +20,14 @@
     "/scene.js": "/scene.js?v=__V__",
     "/tray.js": "/tray.js?v=__V__",
     "/sound.js": "/sound.js?v=__V__",
-    "/reveal.js": "/reveal.js?v=__V__"
+    "/reveal.js": "/reveal.js?v=__V__",
+    "/board2d.js": "/board2d.js?v=__V__"
   } }</script>
 </head>
 <body>
   <canvas id="scene" aria-hidden="true"></canvas>
+  <!-- กระดานแบบ 2D (board2d.js) ใช้แทน canvas เมื่อเลือกโหมด 2D -->
+  <div id="board2d" hidden></div>
 
   <!-- หน้าแรก -->
   <main id="home" class="screen" hidden>
@@ -73,6 +76,7 @@
     </div>
     <div id="menu" class="menu" hidden>
       <div id="menu-players"></div>
+      <button id="board-toggle" class="btn ghost small"></button>
       <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
     </div>
     <div id="log" class="log" aria-live="polite"></div>

@@ -387,3 +387,79 @@ body.shake #game, body.shake .reveal-card { animation: shake 0.5s linear; }
 .reveal-who b { font-size: 34px; font-weight: 600; color: #fff3d6; border: 2px solid #ff5a4e; box-shadow: 0 0 18px rgba(255, 70, 60, 0.6); }
 .reveal-who span { display: block; width: max-content; margin: 6px auto 0; font-size: 20px; font-weight: 600; color: #ff7a6e; }
 .reveal.saved .reveal-text { color: #ffd54a; text-shadow: 0 0 14px rgba(255, 200, 60, 0.85), 0 3px 0 #000; }
+
+/* ---------- กระดาน 2D (board2d.js) ---------- */
+.board2d {
+  --pw: min(22vw, 112px); --ph: calc(var(--pw) * 1.4);
+  position: fixed; inset: 0; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 42%, #4a86c4 0%, #2a5283 45%, #0f1a2c 100%);
+}
+.b2-seats { position: absolute; top: 92px; left: 8px; right: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px; }
+.b2-seat {
+  display: flex; align-items: center; padding: 0; border: none; border-radius: 999px;
+  background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.b2-backs { position: relative; z-index: 1; width: 30px; height: 42px; margin-right: -10px; flex: none; }
+.b2-back { display: block; width: 100%; height: 100%; border-radius: 4px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45); }
+.b2-n {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 20px; padding: 0 4px; text-align: center;
+  background: rgba(14, 12, 24, 0.85); border-radius: 999px; font: 600 12px 'Mitr', sans-serif; color: #fff;
+}
+.b2-plate {
+  position: relative; padding: 4px 12px 4px 16px; display: flex; flex-direction: column; align-items: flex-start;
+  background: rgba(14, 12, 24, 0.78); border: 2px solid rgba(255, 220, 160, 0.18); border-radius: 999px; transition: box-shadow 0.2s, border-color 0.2s;
+}
+.b2-seat.dead .b2-plate { padding-left: 12px; }
+.b2-plate b { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px 'Mitr', sans-serif; color: #f6ecd8; }
+.b2-plate small { font-size: 11px; color: #d8c9ad; }
+.b2-turns { position: absolute; top: -10px; right: -12px; padding: 1px 7px; border-radius: 999px; background: var(--red); color: #fff; font: 600 11px 'Mitr', sans-serif; font-style: normal; }
+.b2-seat.current .b2-plate { border-color: #ffc35a; box-shadow: 0 0 16px rgba(255, 195, 90, 0.75); }
+.b2-seat.dead { opacity: 0.62; }
+.b2-seat.dead .b2-plate { background: rgba(40, 70, 64, 0.7); border-color: rgba(159, 227, 200, 0.6); }
+.b2-seat.dead .b2-plate b, .b2-seat.dead .b2-plate small { color: var(--ghost); }
+.b2-seat.alert .b2-plate { border-color: #ff3b3b; animation: b2-alert 0.32s ease-in-out infinite alternate; }
+@keyframes b2-alert { from { box-shadow: 0 0 0 rgba(255, 59, 59, 0); } to { box-shadow: 0 0 24px 7px rgba(255, 59, 59, 0.9); } }
+.b2-seat.winner .b2-plate { border-color: #ffd54a; box-shadow: 0 0 28px 9px rgba(255, 210, 80, 0.9); }
+
+.b2-center { position: absolute; left: 50%; top: calc((var(--seats-b, 200px) + 100% - var(--hand-h, 200px)) / 2); transform: translate(-50%, -50%); display: flex; align-items: center; gap: 30px; }
+.b2-deck { position: relative; width: var(--pw); height: var(--ph); padding: 0; border: none; background: none; cursor: pointer; }
+.b2-deck-card { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45); }
+.b2-deck-card.l0 { transform: translate(5px, 6px); } .b2-deck-card.l1 { transform: translate(2.5px, 3px); }
+.b2-count {
+  position: absolute; left: 50%; top: -16px; transform: translateX(-50%); padding: 1px 10px; white-space: nowrap;
+  background: rgba(14, 12, 24, 0.9); border: 1px solid rgba(255, 220, 160, 0.3); border-radius: 999px; font: 600 13px 'Mitr', sans-serif; color: #f6ecd8;
+}
+.b2-deck.shuffle { animation: b2-shuffle 0.8s ease-in-out; }
+@keyframes b2-shuffle { 0%, 100% { transform: none; } 20% { transform: rotate(-9deg) translateX(-7px); } 40% { transform: rotate(8deg) translateX(7px); } 60% { transform: rotate(-5deg); } 80% { transform: rotate(3deg); } }
+.b2-discard { position: relative; width: var(--pw); height: var(--ph); }
+.b2-discard-slot { position: absolute; inset: 0; border: 2px dashed rgba(255, 255, 255, 0.25); border-radius: 8px; }
+.b2-discard-card { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; transform: rotate(var(--tilt, 0deg)); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45); }
+
+.b2-hand { position: absolute; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); height: calc(var(--ch, 150px) + 24px); pointer-events: none; }
+.b2-card {
+  position: absolute; bottom: 0; width: var(--cw); height: var(--ch); padding: 0; border: none; background: none; border-radius: 10px;
+  pointer-events: auto; cursor: pointer; transform-origin: 50% 130%; transform: translateY(var(--dip)) rotate(var(--rot));
+  transition: transform 0.15s ease, left 0.2s ease;
+}
+.b2-card img { display: block; width: 100%; height: 100%; border-radius: 10px; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+.b2-card.selected { transform: translateY(-22px) rotate(var(--rot)); }
+.b2-card.selected img { box-shadow: 0 0 0 3px #ffd23f, 0 0 26px rgba(255, 210, 63, 0.95); }
+.b2-fly { position: fixed; z-index: 8; width: min(22vw, 112px); aspect-ratio: 5 / 7; border-radius: 8px; pointer-events: none; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5); }
+.b2-pop {
+  position: fixed; z-index: 9; pointer-events: none; font: 600 56px 'Mitr', sans-serif; color: #ff5a4e;
+  text-shadow: 0 0 12px rgba(255, 40, 40, 0.8), 0 3px 0 #000; animation: b2-pop 0.75s ease-out forwards;
+}
+@keyframes b2-pop { 0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -85%) scale(1); opacity: 0; } }
+.b2-wisp {
+  position: fixed; z-index: 8; width: 56px; height: 56px; translate: -50% -50%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #e6fff4 0%, rgba(120, 230, 190, 0.55) 40%, transparent 70%); transition: left 0.8s ease-in-out, top 0.8s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) { .b2-seat.alert .b2-plate, .b2-deck.shuffle { animation: none; } }
+/* จอใหญ่: ขยายกองกลางกับที่นั่งให้สมกับการ์ดในมือ */
+@media (min-width: 900px) and (min-height: 640px) {
+  .board2d { --pw: 150px; }
+  .b2-fly { width: 150px; }
+  .b2-seats { gap: 12px 22px; }
+  .b2-seat { zoom: 1.25; }
+  .b2-center { gap: 48px; }
+}
