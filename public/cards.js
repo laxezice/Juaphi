@@ -30,8 +30,8 @@ export const kindsFor = (extras) => KIND_ORDER.filter((k) => extras || !CARD_INF
 
 // จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
 const DECK = {
-  nope: [5, 10], sneak: [4, 8], curse: [3, 6], curse2: [1, 2], mirror: [5, 10], wind: [4, 8], beg: [4, 8],
-  imp1: [4, 8], imp2: [4, 8], imp3: [4, 8], imp4: [4, 8], imp5: [4, 8],
+  nope: [6, 12], sneak: [5, 10], curse: [4, 8], curse2: [1, 2], mirror: [6, 12], wind: [5, 10], beg: [4, 8],
+  imp1: [5, 10], imp2: [5, 10], imp3: [5, 10], imp4: [5, 10], imp5: [5, 10],
   // การ์ดเสริม ต้องตรงกับ EXTRA_TABLE
   blackout: [2, 4], possess: [2, 4], grave: [2, 4], fate: [2, 4], reverse: [2, 4], bottom: [2, 4],
 };

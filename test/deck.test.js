@@ -16,15 +16,17 @@ test('4 players: each hand has 1 talisman + 7 others and no ghost', () => {
   }
   assert.equal(count(r.deck, 'ghost'), 3);
   assert.equal(count(r.deck, 'talisman'), 2);
-  assert.equal(all(r).length, 5 + 4 + 3 + 1 + 5 + 4 + 4 + 20 + 4 + 3 + 2);
+  // ชุดหลัก 56 ใบ + ยันต์ในมือ 4 + ผี 3 + ยันต์สำรอง 2 กองจั่วเหลือ 56 - 28 + 5 = 33
+  assert.equal(all(r).length, 56 + 4 + 3 + 2);
+  assert.equal(r.deck.length, 33);
 });
 
 test('7 players use the doubled table', () => {
   const r = buildDeck(7, makeRng(2));
   assert.equal(count(r.deck, 'ghost'), 6);
   assert.equal(count(r.deck, 'talisman'), 3);
-  assert.equal(count(all(r), 'nope'), 10);
-  assert.equal(count(all(r), 'imp3'), 8);
+  assert.equal(count(all(r), 'nope'), 12);
+  assert.equal(count(all(r), 'imp3'), 10);
 });
 
 test('2 players get one ghost', () => {
