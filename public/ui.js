@@ -1,5 +1,5 @@
 // หน้าจอทั้งหมดที่เป็น HTML: หน้าแรก ห้องรอ ปุ่มในเกม กล่องเลือก และบันทึกเหตุการณ์
-import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act } from './net.js';
+import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
 import { CARD_INFO, KIND_ORDER, describeSelection } from './cards.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +9,7 @@ let selected = new Set();
 let modalKey = null;      // กล่องที่เปิดอยู่เพื่อเรื่องอะไร
 let modalResolve = null;
 let targetIds = null;     // id ที่แตะป้ายชื่อเลือกได้ตอนกำลังเลือกเป้าหมาย
+let pendingInvite = null; // เปิดลิงก์เชิญแต่ยังไม่ได้ใส่ชื่อ
 
 const S = () => net.state;
 const G = () => net.state && net.state.game;
@@ -78,6 +79,7 @@ function openModal(key, title, build, { grid = false, cancellable = true } = {})
   body.innerHTML = '';
   body.classList.toggle('grid', grid);
   $('modal-cancel').hidden = !cancellable;
+  $('modal-cancel').textContent = 'ยกเลิก';
   $('modal').hidden = false;
   return new Promise((resolve) => {
     modalResolve = resolve;
@@ -226,6 +228,8 @@ function showScreen(id) {
 
 function renderHome() {
   showScreen('home');
+  $('create').textContent = pendingInvite ? `เข้าห้อง ${pendingInvite}` : 'สร้างห้องใหม่';
+  $('name').placeholder = pendingInvite ? 'ใส่ชื่อแล้วกดเข้าห้อง' : 'เช่น ต้น';
   const list = $('room-list');
   list.innerHTML = '';
   for (const r of net.rooms) {
@@ -391,7 +395,10 @@ export function attachScene(api) {
 
 export function initUI() {
   $('name').value = net.name;
-  $('create').onclick = () => { if (ensureName()) createRoom(); };
+  $('create').onclick = () => {
+    if (!ensureName()) return;
+    if (pendingInvite) joinRoom(pendingInvite); else createRoom();
+  };
   $('name').onkeydown = (e) => { if (e.key === 'Enter') $('create').click(); };
   $('lobby-leave').onclick = () => leaveRoom();
   $('game-leave').onclick = () => { if (confirm('ออกจากห้อง? ถ้าเกมกำลังเล่นอยู่ คุณจะตกรอบ')) { $('menu').hidden = true; leaveRoom(); } };
@@ -414,7 +421,17 @@ export function initUI() {
 
   on('state', () => render());
   on('rooms', () => { if (!S()) renderHome(); });
-  on('error', (msg) => toast(msg));
+  on('error', (msg) => {
+    if (msg) toast(msg);
+    render();   // เปิดกล่องที่ยังค้างอยู่ใหม่ เช่น เสียบผีแล้วตำแหน่งไม่ถูก
+  });
+  on('noroom', () => { pendingInvite = null; });
+  on('replaced', () => {
+    $('conn').hidden = true;
+    openModal('replaced', 'เกมนี้เปิดอยู่ในอีกแท็บหรืออีกเครื่อง', (body, done) => {
+      body.append(chip('เล่นต่อในแท็บนี้', () => done(true)));
+    }, { cancellable: false }).then((ok) => { if (ok) connect(); });
+  });
   on('kicked', () => { toast('คุณถูกเชิญออกจากห้อง'); render(); });
   on('status', (st) => { $('conn').hidden = st === 'online'; });
   on('event', (e) => {
@@ -426,11 +443,12 @@ export function initUI() {
     if (scene) scene.playEvent(e, S());
   });
 
-  // ลิงก์เชิญ ?room=CODE
-  const code = new URLSearchParams(location.search).get('room');
-  if (code && !net.room) {
-    if (net.name) net.room = code.toUpperCase();
-    else { $('name').placeholder = 'ใส่ชื่อแล้วกดเข้าห้อง'; $('create').textContent = `เข้าห้อง ${code.toUpperCase()}`; $('create').onclick = () => { if (ensureName()) joinRoom(code.toUpperCase()); }; }
+  // ลิงก์เชิญ ?room=CODE มาก่อนห้องเดิมที่จำไว้
+  const code = (new URLSearchParams(location.search).get('room') || '').toUpperCase().trim();
+  if (code && code !== net.room) {
+    forgetRoom();
+    if (net.name) net.room = code;
+    else pendingInvite = code;
   }
   history.replaceState(null, '', location.pathname);
   render();

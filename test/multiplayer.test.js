@@ -66,6 +66,112 @@ async function setupRoom(srv, names) {
   return [host, ...rest];
 }
 
+// ---------- จากการรีวิว ----------
+
+test('a path with a null byte does not crash the server', async (t) => {
+  const srv = await startServer(t);
+  const r = await fetch(`http://127.0.0.1:${srv.port}/%00`);
+  assert.notEqual(r.status, 200);
+  await sleep(100);
+  assert.equal((await fetch(`http://127.0.0.1:${srv.port}/healthz`)).status, 200);
+});
+
+test('an oversized websocket message does not crash the server', async (t) => {
+  const srv = await startServer(t);
+  const c = await srv.client('A');
+  c.ws.on('error', () => {});
+  c.ws.send('x'.repeat(64 * 1024));
+  await new Promise((r) => c.ws.once('close', r));
+  await sleep(100);
+  assert.equal((await fetch(`http://127.0.0.1:${srv.port}/healthz`)).status, 200);
+});
+
+test('a second draw sent with a stale seq is ignored (double-tap while cursed)', async (t) => {
+  let seed = 1;
+  for (; seed < 500; seed++) {
+    const g = createGame(['x', 'y', 'z'], makeRng(seed));
+    if (g.players[0].hand.some((c) => c.kind === 'curse') && g.deck[0].kind !== 'ghost' && g.deck[1].kind !== 'ghost') break;
+  }
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: String(seed) });
+  const [a, b] = await setupRoom(srv, ['A', 'B', 'C']);
+  void createGame;
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  const curse = a.state.game.me.hand.find((c) => c.kind === 'curse');
+  a.send({ t: 'act', seq: a.state.seq, action: { type: 'play', uids: [curse.uid] } });
+  await waitFor(() => b.state.game.current === b.id && b.state.game.turnsLeft === 2 && !b.state.game.pending);
+  const seq = b.state.seq;
+  const before = b.state.game.me.hand.length;
+  b.send({ t: 'act', seq, action: { type: 'draw' } });
+  b.send({ t: 'act', seq, action: { type: 'draw' } });
+  await sleep(300);
+  const g = b.state.game;
+  assert.equal(g.me.hand.length, before + 1, 'only one draw should happen');
+  assert.equal(g.current, b.id);
+  assert.equal(g.turnsLeft, 1);
+});
+
+test('each takeover waits a full grace period, even for players offline a long time', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '400' });
+  const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  b.ws.close(); c.ws.close();
+  await sleep(600); // B, C หลุดนานกว่า grace แล้ว
+  const draws = () => a.msgs.filter(({ m }) => m.t === 'event' && (m.e.type === 'draw' || m.e.type === 'ghost')).length;
+  const n0 = draws();
+  a.send({ t: 'act', seq: a.state.seq, action: { type: 'draw' } });
+  await waitFor(() => draws() > n0);
+  await sleep(250);
+  assert.equal(draws(), n0 + 1, 'B must not be auto-played before a full grace period');
+  await waitFor(() => draws() > n0 + 1, 2000);
+});
+
+test('nobody online in the game: the game pauses instead of playing itself', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '150' });
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  const deck = a.state.game.deckCount;
+  const code = a.room;
+  a.ws.close(); b.ws.close();
+  await sleep(800);
+  const a2 = await srv.client('A');
+  a2.send({ t: 'join', room: code, name: 'A', secret: a.secret });
+  await waitFor(() => a2.state && a2.state.game);
+  assert.equal(a2.state.game.deckCount, deck);
+});
+
+test('starting a game seats only players who are online', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30' });
+  const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
+  c.ws.close();
+  await waitFor(() => a.state.room.players.find((p) => p.id === c.id).online === false);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  assert.equal(a.state.game.players.length, 2);
+  assert.ok(!a.state.game.players.some((p) => p.id === c.id));
+  void b;
+});
+
+test('joining a room that no longer exists, or acting outside a room, gets a no-room error', async (t) => {
+  const srv = await startServer(t);
+  const c = await srv.client('A');
+  c.send({ t: 'act', action: { type: 'draw' } });
+  c.send({ t: 'join', room: 'ZZZZ', name: 'A', secret: c.secret });
+  await waitFor(() => c.msgs.filter(({ m }) => m.t === 'error').length >= 2);
+  const errs = c.msgs.filter(({ m }) => m.t === 'error').map(({ m }) => m.code);
+  assert.deepEqual(errs, ['no-room', 'no-room']);
+});
+
+test('opening the same seat in another tab tells the old tab it was replaced', async (t) => {
+  const srv = await startServer(t);
+  const [a] = await setupRoom(srv, ['A', 'B']);
+  const a2 = await srv.client('A');
+  a2.send({ t: 'join', room: a.room, name: 'A', secret: a.secret });
+  await waitFor(() => a.msgs.some(({ m }) => m.t === 'replaced'));
+});
+
 test('/api/art lists the card images that exist, and three.js is served', async (t) => {
   const srv = await startServer(t);
   const fs = require('node:fs');

@@ -395,7 +395,7 @@ export async function createScene(canvas, hooks) {
           c.position.lerpVectors(start, mid, e2);
           c.rotation.set(-Math.PI / 2 + e2 * 1.2, 0, 0);
           c.scale.setScalar(1 + e2 * 1.4);
-          candleDim = 1 - 0.75 * e2;
+          if (!reduced) candleDim = 1 - 0.75 * e2;
         });
         setFace(c, 'ghost');
         c.rotation.y = 0;
@@ -407,7 +407,7 @@ export async function createScene(canvas, hooks) {
           c.position.lerpVectors(mid, e.saved ? seatPos(e.player) : DISCARD.clone().setY(0.08), ease(t));
           c.scale.setScalar(lerp(2.4, 1, ease(t)));
           c.rotation.x = lerp(0.25, -Math.PI / 2, ease(t));
-          candleDim = lerp(0.25, 1, t);
+          if (!reduced) candleDim = lerp(0.25, 1, t);
         });
         scene.remove(c);
         candleDim = 1;

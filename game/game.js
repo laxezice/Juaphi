@@ -257,6 +257,9 @@ function removePlayer(g, id, rng) {
   } else if (pd && pd.kind === 'give' && pd.from === id) {
     if (p.hand.length) events.push(...doGive(g, p, p.hand[randomIndex(p.hand.length, rng)].uid).events);
     g.pending = null;
+  } else if (pd && pd.kind === 'give' && pd.to === id) {
+    // คนที่ขอของออกไปแล้ว ไม่ต้องให้
+    g.pending = null;
   } else if (pd && pd.kind === 'insert' && pd.player === id) {
     g.deck.splice(randomIndex(g.deck.length + 1, rng), 0, pd.ghost);
     g.pending = null;

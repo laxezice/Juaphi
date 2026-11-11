@@ -34,16 +34,22 @@ const TYPES = {
 
 // ---------- HTTP ----------
 function serveFile(res, file) {
-  fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
-    res.end(data);
-  });
+  const notFound = () => { res.writeHead(404); res.end('not found'); };
+  try {
+    fs.readFile(file, (err, data) => {
+      if (err) return notFound();
+      res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+      res.end(data);
+    });
+  } catch {
+    notFound();
+  }
 }
 
 const server = http.createServer((req, res) => {
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { p = '/'; }
+  if (p.includes('\0')) { res.writeHead(400); return res.end(); }
   if (p === '/') p = '/index.html';
   if (p === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (p === '/api/art') {
@@ -118,6 +124,7 @@ function stateFor(r, p) {
   const seatedInGame = r.game && r.game.players.some((x) => x.id === p.id);
   return {
     t: 'state',
+    seq: r.seq,
     you: p.id,
     room: {
       code: r.code,
@@ -132,6 +139,7 @@ function stateFor(r, p) {
 }
 
 function broadcast(r) {
+  r.seq = (r.seq || 0) + 1;   // ทุกสถานะมีเลขลำดับ คำสั่งที่อ้างเลขเก่า (กดซ้ำ) จะถูกปัดทิ้ง
   for (const p of r.players) send(p.ws, stateFor(r, p));
   pushRoomList();
 }
@@ -162,6 +170,7 @@ function ensureHost(r) {
 function afterChange(r, events) {
   if (events && events.length) deliver(r, events);
   const g = r.game;
+  if (g && g.winner) for (const p of r.players) if (!p.online) armDrop(r, p);
   clearTimeout(r.windowTimer);
   if (g && g.pending && g.pending.kind === 'window') {
     if (!r.windowEndsAt) r.windowEndsAt = Date.now() + NOPE_MS;
@@ -177,13 +186,15 @@ function afterChange(r, events) {
   broadcast(r);
 }
 
-/** ถ้าคนที่เกมรออยู่หลุด รอ GRACE_MS แล้วทำแทน */
+/** ถ้าคนที่เกมรออยู่หลุด รอ GRACE_MS (นับจากตอนที่เริ่มรอเขา) แล้วทำแทน
+ *  ถ้าไม่มีใครในเกมออนไลน์เลย หยุดรอไว้ก่อน เกมจะได้ไม่เล่นตัวเองจนจบ */
 function scheduleTakeover(r) {
   const g = r.game;
   const id = g ? G.waitingOn(g) : null;
   const p = id && r.players.find((x) => x.id === id);
   const offline = !p || !p.online;
-  if (!id || !offline) {
+  const anyoneHere = g && g.players.some((gp) => r.players.some((x) => x.id === gp.id && x.online));
+  if (!id || !offline || !anyoneHere) {
     clearTimeout(r.takeoverTimer);
     r.takeoverTimer = null;
     r.takeoverFor = null;
@@ -193,7 +204,7 @@ function scheduleTakeover(r) {
   if (r.takeoverFor === key) return;
   clearTimeout(r.takeoverTimer);
   r.takeoverFor = key;
-  const since = p ? p.offlineSince : Date.now();
+  const since = Date.now();   // เริ่มนับจากตอนที่เริ่มรอคนนี้ ไม่ใช่ตอนที่เขาหลุด
   r.takeoverTimer = setTimeout(() => {
     r.takeoverTimer = null;
     r.takeoverFor = null;
@@ -203,9 +214,16 @@ function scheduleTakeover(r) {
   }, Math.max(0, since + GRACE_MS - Date.now()));
 }
 
+function armDrop(r, p) {
+  if (p.dropTimer) return;
+  p.dropTimer = setTimeout(() => { p.dropTimer = null; if (!p.online && r.players.includes(p)) removeFromRoom(r, p); }, LOBBY_DROP_MS);
+}
+
 function startGame(r) {
-  const seated = r.players.slice(0, MAX_SEATS);
-  for (const p of seated) { p.seat = 'player'; r.names[p.id] = p.name; }
+  // แจกเฉพาะคนที่ออนไลน์ คนที่หลุดอยู่ได้ดูก่อนแล้วเล่นเกมถัดไป
+  const seated = r.players.filter((p) => p.online).slice(0, MAX_SEATS);
+  for (const p of r.players) p.seat = seated.includes(p) ? 'player' : 'watch';
+  for (const p of seated) { clearTimeout(p.dropTimer); p.dropTimer = null; r.names[p.id] = p.name; }
   r.rng = SEED != null ? makeRng(SEED) : Math.random;
   r.game = G.createGame(seated.map((p) => p.id), r.rng);
   r.windowEndsAt = 0;
@@ -237,18 +255,24 @@ function deleteRoom(r) {
 }
 
 // ---------- WebSocket ----------
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 16 * 1024 });
 
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
+  ws.on('error', () => {});   // เฟรมเสียหรือใหญ่เกิน ปิดแค่ socket นี้ ไม่ให้เซิร์ฟเวอร์ล่ม
   let me = null;
   let room = null;
-  const fail = (msg) => send(ws, { t: 'error', msg });
+  const fail = (msg, code) => send(ws, code ? { t: 'error', msg, code } : { t: 'error', msg });
 
   function attach(r, p) {
-    if (p.ws && p.ws !== ws) { p.ws.__replaced = true; p.ws.close(); }
+    if (p.ws && p.ws !== ws) {
+      send(p.ws, { t: 'replaced' });   // เปิดที่นั่งเดียวกันจากแท็บอื่น แท็บเก่าหยุดต่อใหม่เอง
+      p.ws.__replaced = true;
+      p.ws.close();
+    }
     clearTimeout(p.dropTimer);
+    p.dropTimer = null;
     clearTimeout(r.idleTimer);
     p.ws = ws; p.online = true;
     me = p; room = r;
@@ -278,7 +302,7 @@ wss.on('connection', (ws) => {
         r = createRoom();
       } else {
         r = rooms.get(String(m.room || '').toUpperCase().trim());
-        if (!r) return fail('ไม่พบห้องนี้ เช็กรหัสห้องอีกที');
+        if (!r) return fail('ไม่พบห้องนี้ เช็กรหัสห้องอีกที', 'no-room');
       }
       const back = secret && r.players.find((p) => p.secret === secret);
       if (back) return attach(r, back);
@@ -291,7 +315,7 @@ wss.on('connection', (ws) => {
       return attach(r, p);
     }
 
-    if (!me || !room) return;
+    if (!me || !room) return fail('คุณไม่ได้อยู่ในห้องแล้ว', 'no-room');
     const r = room;
     const isHost = me.id === r.hostId;
 
@@ -299,11 +323,14 @@ wss.on('connection', (ws) => {
       case 'start': {
         if (!isHost) return fail('หัวห้องเป็นคนเริ่มเกม');
         if (inGame(r)) return fail('เกมกำลังเล่นอยู่');
-        if (r.players.length < MIN_PLAYERS) return fail(`ต้องมีอย่างน้อย ${MIN_PLAYERS} คน`);
+        if (r.players.filter((p) => p.online).length < MIN_PLAYERS) return fail(`ต้องมีคนออนไลน์อย่างน้อย ${MIN_PLAYERS} คน`);
         return startGame(r);
       }
       case 'act': {
         if (!r.game) return fail('ยังไม่เริ่มเกม');
+        // จั่วหรือ "ไม่!" ที่อ้างสถานะเก่า = กดซ้ำ ปัดทิ้งเงียบๆ
+        const type = m.action && m.action.type;
+        if ((type === 'draw' || type === 'nope') && typeof m.seq === 'number' && m.seq !== r.seq) return fail('', 'stale');
         const before = r.game.pending;
         const res = G.act(r.game, me.id, m.action, r.rng);
         if (!res.ok) return fail(res.error);
@@ -336,9 +363,7 @@ wss.on('connection', (ws) => {
     p.online = false;
     p.offlineSince = Date.now();
     p.ws = null;
-    if (!inGame(r) || !r.game.players.some((x) => x.id === p.id)) {
-      p.dropTimer = setTimeout(() => { if (!p.online && r.players.includes(p)) removeFromRoom(r, p); }, LOBBY_DROP_MS);
-    }
+    if (!inGame(r) || !r.game.players.some((x) => x.id === p.id)) armDrop(r, p);
     setTimeout(() => { ensureHost(r); broadcast(r); }, GRACE_MS + 10);
     if (!r.players.some((x) => x.online)) {
       r.idleTimer = setTimeout(() => { if (!r.players.some((x) => x.online)) deleteRoom(r); }, ROOM_IDLE_MS);

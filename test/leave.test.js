@@ -82,6 +82,16 @@ test('removing a player who owes a give hands the beggar a random card', () => {
   assert.equal(g.current, 'A');
 });
 
+test('if the beggar leaves while the target owes a give, the give is dropped', () => {
+  const g = rig({ A: ['beg'], B: ['wind'], C: [] }, ['mirror', 'ghost']);
+  act(g, 'A', { type: 'play', uids: [uidOf(g, 'A', 'beg')], target: 'B' }, R);
+  resolvePending(g, R);
+  removePlayer(g, 'A', R);
+  assert.equal(g.pending, null);
+  assert.deepEqual(kinds(player(g, 'B').hand), ['wind']);
+  assert.equal(g.current, 'B');
+});
+
 test('removing the player whose play is in a window cancels it', () => {
   const g = rig({ A: ['sneak'], B: [], C: [] }, ['ghost', 'mirror', 'ghost']);
   act(g, 'A', { type: 'play', uids: [uidOf(g, 'A', 'sneak')] }, R);

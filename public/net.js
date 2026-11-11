@@ -18,7 +18,8 @@ export const net = {
   room: store.get('room'),
   secret: store.get('secret') || randomSecret(),
   name: store.get('name') || '',
-  listeners: { state: [], event: [], rooms: [], error: [], status: [], kicked: [] },
+  listeners: { state: [], event: [], rooms: [], error: [], status: [], kicked: [], replaced: [], noroom: [] },
+  replaced: false,
   retry: 0,
 };
 store.set('secret', net.secret);
@@ -31,6 +32,7 @@ export function send(msg) {
 }
 
 export function connect() {
+  net.replaced = false;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   net.ws = ws;
@@ -43,19 +45,23 @@ export function connect() {
   ws.onmessage = (ev) => {
     let m;
     try { m = JSON.parse(ev.data); } catch { return; }
-    if (m.t === 'state') { net.state = m; emit('state', m); }
+    // ออกจากห้องแล้ว สถานะที่ยังค้างมาจากห้องเดิมไม่ต้องสนใจ
+    if (m.t === 'state') { if (!net.room) return; net.state = m; emit('state', m); }
     else if (m.t === 'event') emit('event', m.e);
     else if (m.t === 'rooms') { net.rooms = m.rooms; emit('rooms', m.rooms); }
     else if (m.t === 'joined') { net.room = m.room; store.set('room', m.room); }
     else if (m.t === 'kicked') { forgetRoom(); emit('kicked'); }
+    else if (m.t === 'replaced') { net.replaced = true; emit('replaced'); }
     else if (m.t === 'error') {
-      // ห้องหายไปแล้ว (เซิร์ฟเวอร์รีสตาร์ต) ลืมห้องเดิม
-      if (!net.state && /ไม่พบห้อง/.test(m.msg)) forgetRoom();
+      if (m.code === 'stale') return emit('error', '');
+      // ห้องหายไปแล้ว (เช่น เซิร์ฟเวอร์รีสตาร์ต) ลืมห้องเดิมแล้วกลับหน้าแรก
+      if (m.code === 'no-room') { const had = !!net.state; forgetRoom(); emit('noroom'); if (had) emit('state', null); }
       emit('error', m.msg);
     }
   };
   ws.onclose = () => {
     if (net.ws !== ws) return;
+    if (net.replaced) return;   // อีกแท็บเอาที่นั่งไปแล้ว ไม่ต่อใหม่จนกว่าผู้ใช้จะกด
     emit('status', 'offline');
     const wait = Math.min(5000, 500 * 2 ** net.retry++);
     setTimeout(connect, wait);
@@ -87,4 +93,5 @@ export function leaveRoom() {
   emit('state', null);
 }
 
-export const act = (action) => send({ t: 'act', action });
+// แนบเลขลำดับสถานะที่เห็นอยู่ เซิร์ฟเวอร์ปัดทิ้งการกดซ้ำ
+export const act = (action) => send({ t: 'act', seq: net.state ? net.state.seq : undefined, action });
