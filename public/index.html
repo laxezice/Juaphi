@@ -77,7 +77,13 @@
       <div id="prompt" class="prompt"></div>
       <div id="window-bar" class="window-bar" hidden><span></span></div>
       <div class="row">
-        <button id="nope" class="btn nope" hidden>ไม่!</button>
+        <button id="nope" class="btn nope" hidden>
+          <svg class="nope-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="ring-track" cx="50" cy="50" r="46"></circle>
+            <circle id="nope-ring" class="ring-time" cx="50" cy="50" r="46"></circle>
+          </svg>
+          <span>ไม่!</span>
+        </button>
         <button id="play" class="btn primary" hidden></button>
         <button id="draw" class="btn draw" hidden>จั่ว</button>
         <button id="grudge" class="btn ghostly" hidden>อาฆาต</button>

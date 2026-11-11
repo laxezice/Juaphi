@@ -6,6 +6,7 @@ import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePan
 const $ = (id) => document.getElementById(id);
 const NOPE_MS = 3000;
 const MAX_SEATS = 8;   // ต้องตรงกับ server.js
+const RING_LEN = 2 * Math.PI * 46;   // เส้นรอบวงของวงแหวนนับเวลารอบปุ่ม ไม่! (r = 46 ใน index.html)
 let scene = null;
 let selected = new Set();
 let modalKey = null;      // กล่องที่เปิดอยู่เพื่อเรื่องอะไร
@@ -403,21 +404,30 @@ function renderGame(s) {
   $('play').disabled = !sel.ok;
   $('grudge').hidden = !(me && !me.alive && me.grudge && !pd && !g.winner);
 
-  // แถบนับเวลา "ไม่!"
+  // นับเวลา "ไม่!": คนที่กดได้เห็นเป็นวงแหวนรอบปุ่ม คนที่ไม่มีการ์ด ไม่! เห็นเป็นแถบยาว
+  const windowOpen = !!(pd && pd.kind === 'window');
   const bar = $('window-bar');
-  bar.hidden = !(pd && pd.kind === 'window');
-  if (!bar.hidden) {
-    const span = bar.firstElementChild;
-    const key = `${pd.actor}:${pd.kinds.join()}:${pd.nopeCount}`;
-    if (bar.dataset.key !== key) {
-      bar.dataset.key = key;
+  bar.hidden = !windowOpen || canNope;
+  const ring = $('nope-ring');
+  const key = windowOpen ? `${pd.actor}:${pd.kinds.join()}:${pd.nopeCount}` : '';
+  if (bar.dataset.key !== key) {
+    bar.dataset.key = key;
+    if (windowOpen) {
+      const left = s.windowLeftMs;
+      const span = bar.firstElementChild;
       span.style.transition = 'none';
-      span.style.transform = `scaleX(${Math.min(1, s.windowLeftMs / NOPE_MS)})`;
+      span.style.transform = `scaleX(${Math.min(1, left / NOPE_MS)})`;
+      // วงแหวน: เส้นรอบวงเต็ม = เวลาเต็ม ค่อยๆ หดจนหมด
+      ring.style.transition = 'none';
+      ring.style.strokeDashoffset = String(RING_LEN * (1 - Math.min(1, left / NOPE_MS)));
       span.getBoundingClientRect();
-      span.style.transition = `transform ${s.windowLeftMs}ms linear`;
+      ring.getBoundingClientRect();
+      span.style.transition = `transform ${left}ms linear`;
       span.style.transform = 'scaleX(0)';
+      ring.style.transition = `stroke-dashoffset ${left}ms linear`;
+      ring.style.strokeDashoffset = String(RING_LEN);
     }
-  } else bar.dataset.key = '';
+  }
 
   // คำแนะนำ
   let prompt = '';

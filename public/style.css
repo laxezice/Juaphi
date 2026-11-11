@@ -256,3 +256,15 @@ body.chain-open .log, body.tray-open .chain { visibility: hidden; }
 .actions .row .btn.nope { filter: drop-shadow(0 0 10px rgba(255, 80, 60, 0.95)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55)); }
 @keyframes btn-halo { from { opacity: 0.55; transform: scale(0.9); } to { opacity: 1; transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .actions .row .btn.draw::before, .actions .row .btn.nope::before { animation: none; } }
+
+/* ---------- วงแหวนนับเวลารอบปุ่ม ไม่! (ui.js ขยับ stroke-dashoffset จากเต็มวงจนหมด) ---------- */
+.actions .row .btn.nope > span { position: relative; z-index: 1; }
+.nope-ring {
+  position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px);
+  transform: rotate(-90deg); pointer-events: none; overflow: visible;
+}
+.ring-track { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 5; }
+.ring-time {
+  fill: none; stroke: #ffe1d8; stroke-width: 5.5; stroke-linecap: round;
+  stroke-dasharray: 289.03; stroke-dashoffset: 0; filter: drop-shadow(0 0 4px rgba(255, 80, 60, 0.95));
+}
