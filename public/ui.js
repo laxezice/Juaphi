@@ -556,4 +556,6 @@ export function initUI() {
 export const sceneHooks = {
   onCardTap: (uid) => toggleCard(uid),
   onPlayerTap: (id) => { if (targetIds && targetIds.ids.includes(id)) targetIds.done(id); },
+  // แตะกองจั่ว = กดปุ่มจั่ว (เฉพาะตอนที่ปุ่มจั่วกดได้)
+  onDeckTap: () => { if (!$('draw').hidden && trayKey() === null && $('modal').hidden) $('draw').click(); },
 };

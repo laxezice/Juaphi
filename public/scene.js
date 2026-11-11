@@ -5,9 +5,20 @@ import { drawCardFace, drawCardBack, KIND_ORDER } from './cards.js';
 
 const CW = 0.7;
 const CH = 0.98;
-// พื้นที่ล่างจอที่ ui ใช้: ปุ่ม (สูงสุด 64) + แถบนับเวลา + ข้อความแนะนำ 2 บรรทัด การ์ดในมืออยู่เหนือส่วนนี้
-const ACTION_BAR_PX = 150;
+// การ์ดในมือชิดล่างจอ เว้นแค่ขอบนิดหน่อย (ปุ่มกับข้อความแนะนำอยู่เหนือการ์ดในมือ ui อ่านความสูงจาก --hand-h)
+const HAND_BOTTOM_PX = 14;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** ระยะแถบโฮมด้านล่างของ iPhone (env(safe-area-inset-bottom)) อ่านตรงๆ ไม่ได้ ต้องวัดจาก element */
+let safeProbe = null;
+function safeBottom() {
+  if (!safeProbe) {
+    safeProbe = document.createElement('div');
+    safeProbe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none';
+    document.body.append(safeProbe);
+  }
+  return safeProbe.offsetHeight;
+}
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -18,11 +29,12 @@ export async function createScene(canvas, hooks) {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.05;
 
+  // โต๊ะธรรมดาสว่างๆ มองกองจั่วกับการ์ดได้ชัด (เลิกใช้ห้องมืดกับเทียน ผู้ใช้บอกว่ามองกองยาก)
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x07060c);
-  scene.fog = new THREE.Fog(0x07060c, 9, 22);
+  scene.background = new THREE.Color(0x0f1a2c);
+  scene.fog = new THREE.Fog(0x0f1a2c, 14, 30);
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 60);
   scene.add(camera);
   const camBase = new THREE.Vector3();
@@ -57,45 +69,32 @@ export async function createScene(canvas, hooks) {
   const goldTex = glowTexture('rgba(255,250,220,1)', 'rgba(255,190,60,0.6)');
   const redTex = glowTexture('rgba(255,220,220,1)', 'rgba(220,40,40,0.6)');
 
-  // ---------- ห้องกับโต๊ะ ----------
-  scene.add(new THREE.HemisphereLight(0x4a5a8a, 0x120808, 0.55));
-  const woodCanvas = document.createElement('canvas');
-  woodCanvas.width = 512; woodCanvas.height = 512;
+  // ---------- พื้นเล่น (ไม่มีโต๊ะ ผู้ใช้ขอให้เหลือแค่พื้นหลัง) ----------
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4250, 1.4));
+  // ไฟหลักส่องจากด้านบน ตอนผีโผล่จะวูบลง (candleDim)
+  const mainLight = new THREE.DirectionalLight(0xfff4e0, 1.8);
+  mainLight.position.set(1.5, 9, 4);
+  scene.add(mainLight);
+  // พื้นไล่สีฟ้า สว่างตรงกลางที่วางกอง เข้มลงเป็นน้ำเงินกรมที่ขอบ การ์ดทั้งหมดวางบนพื้นนี้
+  const floorCanvas = document.createElement('canvas');
+  floorCanvas.width = floorCanvas.height = 512;
   {
-    const ctx = woodCanvas.getContext('2d');
-    ctx.fillStyle = '#3b2415';
+    const ctx = floorCanvas.getContext('2d');
+    const g = ctx.createRadialGradient(256, 256, 20, 256, 256, 256);
+    g.addColorStop(0, '#4a86c4');
+    g.addColorStop(0.45, '#2a5283');
+    g.addColorStop(1, '#0f1a2c');
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 90; i++) {
-      ctx.strokeStyle = `rgba(${20 + Math.random() * 30},${10 + Math.random() * 15},5,${0.25 + Math.random() * 0.3})`;
-      ctx.lineWidth = 1 + Math.random() * 3;
-      ctx.beginPath();
-      const y = Math.random() * 512;
-      ctx.moveTo(0, y);
-      for (let x = 0; x <= 512; x += 32) ctx.lineTo(x, y + Math.sin(x / 60 + i) * 6);
-      ctx.stroke();
-    }
   }
-  const table = new THREE.Mesh(
-    new THREE.CylinderGeometry(4.3, 4.1, 0.35, 72),
-    new THREE.MeshStandardMaterial({ map: toTex(woodCanvas), roughness: 0.75, metalness: 0.05 }),
-  );
-  table.position.y = -0.18;
-  scene.add(table);
-  const cloth = new THREE.Mesh(
-    new THREE.CircleGeometry(3.7, 72),
-    new THREE.MeshStandardMaterial({ color: 0x3a0f16, roughness: 0.95 }),
-  );
-  cloth.rotation.x = -Math.PI / 2;
-  cloth.position.y = 0.002;
-  scene.add(cloth);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x0c0a10, roughness: 1 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), new THREE.MeshStandardMaterial({ map: toTex(floorCanvas), roughness: 1 }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -3;
+  floor.position.y = -0.002;
   scene.add(floor);
 
-  // เทียน
+  // ไม่มีเทียนแล้ว (โต๊ะสว่าง) เหลือไว้เป็นรายการว่างให้โค้ดส่วนอื่นใช้ต่อได้
   const candles = [];
-  for (const [x, z, h] of [[-3.3, -1.2, 0.7], [3.3, -1.2, 0.55], [0, -3.6, 0.85], [-2.6, 2.6, 0.45], [2.7, 2.5, 0.6]]) {
+  for (const [x, z, h] of []) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, h, 16), new THREE.MeshStandardMaterial({ color: 0xe9dcc0, roughness: 0.6, emissive: 0x2a1505 }));
@@ -272,7 +271,11 @@ export async function createScene(canvas, hooks) {
     const rows = n > 5 && W < 600 ? 2 : 1;
     const perRow = Math.ceil(n / rows);
     const avail = W * 0.94 - cardW;
-    const baseY = -hh + (ACTION_BAR_PX + cardPx * 0.5 + 6) * k;
+    const bottomPx = HAND_BOTTOM_PX + safeBottom();
+    const baseY = -hh + (bottomPx + cardPx * 0.5) * k;
+    // บอก ui ว่ามือสูงแค่ไหน (รวมระยะที่การ์ดยกขึ้นตอนเลือก) ปุ่มกับข้อความจะได้วางเหนือมือพอดี
+    const handTop = n ? bottomPx + cardPx * (rows === 2 ? 1.52 : 1) + 30 : bottomPx;
+    document.documentElement.style.setProperty('--hand-h', `${Math.round(handTop)}px`);
     const seen = new Set();
     cards.forEach((c, i) => {
       seen.add(c.uid);
@@ -492,7 +495,9 @@ export async function createScene(canvas, hooks) {
       return;
     }
     const plates = ray.intersectObjects([...seats.values()].map((s) => s.label.sprite), false);
-    if (plates.length) hooks.onPlayerTap(plates[0].object.userData.playerId);
+    if (plates.length) return hooks.onPlayerTap(plates[0].object.userData.playerId);
+    // แตะกองจั่ว (หรือป้ายจำนวนใบ) = จั่ว
+    if (deckStack.visible && ray.intersectObjects([deckStack, deckLabel.sprite], false).length && hooks.onDeckTap) hooks.onDeckTap();
   });
 
   // ---------- วาดจากสถานะ ----------
@@ -554,6 +559,7 @@ export async function createScene(canvas, hooks) {
       c.light.intensity = c.base * f * candleDim;
       c.flame.scale.set(0.32 * f, 0.5 * f * (0.6 + 0.4 * candleDim), 1);
     }
+    mainLight.intensity = 1.8 * (0.35 + 0.65 * candleDim);   // ผีโผล่ ไฟวูบ
     for (const st of seats.values()) if (st.current) st.ring.material.opacity = 0.6 + 0.3 * Math.sin(now / 300);
     // การ์ดในมือเลื่อนเข้าที่
     for (const m of handCards.values()) {

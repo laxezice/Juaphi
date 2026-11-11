@@ -177,3 +177,42 @@ body.tray-open .actions, body.tray-open #hand, body.tray-open .log { visibility:
 .combo-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.45; }
 .combo-text b { font: 600 16px 'Mitr', sans-serif; color: #fff3d6; }
 @media (prefers-reduced-motion: reduce) { .tcard, .info-banner { animation: none; transition: none; } }
+
+/* ---------- ปุ่มในเกม: คอลัมน์ปุ่มกลมด้านขวา ข้อความแนะนำด้านซ้าย ทั้งคู่อยู่เหนือการ์ดในมือ (--hand-h มาจาก scene.js) ---------- */
+.actions {
+  left: 0; right: 0; bottom: calc(var(--hand-h, 170px) + 4px); padding: 0 12px;
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "prompt btns" "bar bar"; align-items: end; column-gap: 10px;
+}
+.prompt {
+  grid-area: prompt; justify-self: start; text-align: left; margin: 0; padding: 6px 12px; max-width: 100%;
+  background: rgba(11, 10, 18, 0.62); border: 1px solid var(--line); border-radius: 12px;
+}
+.prompt:empty { display: none; }
+.window-bar { grid-area: bar; margin: 8px 0 0; }
+.actions .row { grid-area: btns; flex-direction: column; align-items: flex-end; gap: 10px; }
+.actions .row .btn { flex: none; width: auto; }
+.actions .row .btn.draw {
+  width: 84px; height: 84px; min-height: 0; padding: 0; border-radius: 50%; font-size: 24px;
+  box-shadow: 0 0 0 2px rgba(255, 220, 160, 0.35), 0 0 18px rgba(230, 176, 77, 0.45), 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+.actions .row .btn.nope {
+  width: 100px; height: 100px; min-height: 0; padding: 0; border-radius: 50%; font-size: 30px;
+  box-shadow: 0 0 0 3px rgba(255, 200, 190, 0.5), 0 0 26px rgba(224, 87, 76, 0.85); animation: nope-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes nope-pulse { to { transform: scale(1.07); } }
+.actions .row #play { max-width: 190px; min-height: 48px; font-size: 15px; line-height: 1.25; white-space: normal; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6); }
+#grudge { min-height: 48px; }
+.hand { bottom: 8px; }
+@media (prefers-reduced-motion: reduce) { .btn.nope { animation: none; } }
+
+/* ---------- ปุ่มจั่วกับไม่! เป็นภาพ (public/buttons) ตัวหนังสืออยู่ตรงกลางภาพ ---------- */
+.actions .row .btn.draw, .actions .row .btn.nope {
+  display: grid; place-items: center; padding: 0; border: none; border-radius: 0; box-shadow: none;
+  background: var(--btn-draw) center / contain no-repeat; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+  width: 112px; height: 112px; font: 600 30px 'Mitr', sans-serif; color: #fff8e6;
+  text-shadow: 0 0 3px #2a0a00, 0 0 3px #2a0a00, 2px 2px 0 #2a0a00, -2px -2px 0 #2a0a00, 2px -2px 0 #2a0a00, -2px 2px 0 #2a0a00, 0 3px 8px rgba(0, 0, 0, 0.8);
+  transition: transform 0.12s ease;
+}
+.actions .row .btn.nope { background-image: var(--btn-nope); width: 124px; height: 124px; font-size: 34px; }
+.actions .row .btn.draw:hover { transform: scale(1.05); }
+.actions .row .btn.draw:active, .actions .row .btn.nope:active { transform: scale(0.94); }
