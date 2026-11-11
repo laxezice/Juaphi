@@ -70,3 +70,50 @@ npm run art
 prompt สำหรับให้ Codex สร้างภาพอยู่ใน `docs/card-art-prompts.md`
 
 id ของการ์ด: `ghost talisman nope sneak curse curse2 mirror wind beg imp1 imp2 imp3 imp4 imp5`
+
+## ขึ้นเซิร์ฟเวอร์
+
+อยู่บนเครื่อง Vultr (207.148.66.224) เครื่องเดียวกับ Watch & Learn, sai-suek และ Vanguard ไฟล์ทั้งหมดอยู่ใน `tools/deploy/`
+
+| | |
+|---|---|
+| พอร์ต (ฟังที่ 127.0.0.1) | 3030 |
+| user ที่รัน | `juaphi` |
+| โค้ด | `/opt/juaphi` (root เป็นเจ้าของ เกมอ่านได้อย่างเดียว) |
+| repo บนเซิร์ฟเวอร์ | `/opt/juaphi.git` (remote ชื่อ `vultr`) |
+| โดเมน | juaphi.laxezice.win |
+
+เกมไม่เก็บข้อมูลลงดิสก์ ห้องอยู่ในหน่วยความจำ ทุกครั้งที่อัปเดตหรือรีสตาร์ต ห้องที่เปิดอยู่จะปิด
+
+### อัปเดตเกม
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\deploy\deploy.ps1
+```
+
+สคริปต์เช็กก่อนว่ามีคนเล่นอยู่ไหม ถ้ามีจะหยุด (สั่งซ้ำพร้อม `-Force` ถ้าจะอัปเดตทั้งที่มีคนเล่น)
+แล้ว push `main` ไปที่เซิร์ฟเวอร์ และรัน `update.sh` (checkout, `npm ci`, ติดตั้ง service, รีสตาร์ต, เช็ก `/healthz`)
+ย้อนกลับไปรุ่นก่อนด้วย `-Ref <commit>`
+
+ดูว่ามีใครเล่นอยู่ (ทุกเกมบนเครื่องที่รองรับ):
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\deploy\rooms.ps1
+```
+
+บนเซิร์ฟเวอร์: `systemctl status juaphi`, `journalctl -u juaphi -f`, `systemctl restart juaphi`
+
+### ขึ้นครั้งแรก / ย้ายเครื่อง
+
+1. บนเซิร์ฟเวอร์: คัดลอก `tools/deploy/setup-server.sh` ขึ้นไปแล้วรัน `bash setup-server.sh` (สร้าง user, repo เปล่า และโฟลเดอร์โค้ด)
+2. ในเครื่องนี้: `git remote add vultr root@<IP>:/opt/juaphi.git` แล้ว ssh เข้าเครื่องหนึ่งครั้งให้รู้จัก host key
+3. รัน `deploy.ps1` (ย้ายเครื่องใช้ `-Server root@<IP ใหม่>`)
+4. เพิ่มใน `/etc/cloudflared/config.yml` เหนือบรรทัด `- service: http_status:404`
+
+   ```yaml
+   - hostname: juaphi.laxezice.win
+     service: http://127.0.0.1:3030
+   ```
+
+   แล้ว `cloudflared tunnel route dns <tunnel> juaphi.laxezice.win` หนึ่งครั้ง และ `systemctl restart cloudflared`
+   (ทุกเกมบนเครื่องจะหลุดการเชื่อมต่อแป๊บหนึ่ง)

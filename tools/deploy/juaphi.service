@@ -1,0 +1,29 @@
+# vps-game-server: juaphi on 127.0.0.1:3030 (tools/deploy/update.sh installs this file; edit it in the repo).
+# Players come in through the front door (https://juaphi.laxezice.win). The code in /opt/juaphi is owned by root: the game can only read it.
+[Unit]
+Description=juaphi game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=juaphi
+WorkingDirectory=/opt/juaphi
+Environment=NODE_ENV=production
+Environment=PORT=3030
+Environment=HOST=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# /run/juaphi for the admin socket listing the open rooms (admin.js, tools/deploy/rooms.sh); systemd passes
+# its path in RUNTIME_DIRECTORY and removes it when the game stops. The game keeps no data on disk.
+RuntimeDirectory=juaphi
+# Optional: a leak then restarts the game instead of swapping the whole machine to a halt. Size it from the
+# "Memory:" line of  systemctl status juaphi  after a busy evening, about 2-3x that.
+#MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target

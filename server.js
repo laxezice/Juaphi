@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const G = require('./game/game');
+const { summarizeRooms, startAdminSocket } = require('./admin');
 const { viewFor } = require('./game/view');
 const { makeRng } = require('./game/deck');
 
@@ -141,6 +142,7 @@ function stateFor(r, p) {
 
 function broadcast(r) {
   r.seq = (r.seq || 0) + 1;   // ทุกสถานะมีเลขลำดับ คำสั่งที่อ้างเลขเก่า (กดซ้ำ) จะถูกปัดทิ้ง
+  r.lastActive = Date.now();  // ไว้บอกว่าห้องเงียบมากี่นาที (admin.js)
   for (const p of r.players) send(p.ws, stateFor(r, p));
   pushRoomList();
 }
@@ -386,4 +388,5 @@ wss.on('close', () => clearInterval(heartbeat));
 
 server.listen(PORT, HOST, () => {
   console.log(`จั่วผี พร้อมที่ http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  startAdminSocket(() => summarizeRooms(rooms));
 });
