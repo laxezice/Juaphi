@@ -44,6 +44,13 @@ async function buffer(name) {
   return buffers.get(name);
 }
 
+// ความเร็วกับความดังของไฟล์เสียงแต่ละตัว (rate 2 = เร็วขึ้นสองเท่า, gain 0.6 = เบาลงเหลือ 60%)
+const TUNE = {
+  shuffle: { rate: 2, gain: 1 },
+  card: { rate: 1.25, gain: 0.6 },
+  draw: { rate: 1.25, gain: 0.6 },
+};
+
 /** เล่นเสียง delay = วินาทีที่รอก่อนเล่น */
 export async function play(name, { gain = 1, delay = 0 } = {}) {
   if (muted) return;
@@ -52,10 +59,12 @@ export async function play(name, { gain = 1, delay = 0 } = {}) {
   const buf = await buffer(name);
   const t = a.currentTime + delay;
   if (buf) {
+    const tune = TUNE[name] || {};
     const src = a.createBufferSource();
     src.buffer = buf;
+    src.playbackRate.value = tune.rate || 1;
     const g = a.createGain();
-    g.gain.value = gain;
+    g.gain.value = gain * (tune.gain ?? 1);
     src.connect(g).connect(a.destination);
     src.start(t);
     return;

@@ -1,0 +1,5 @@
+Sounds in this folder: Casino Audio 1.1 by Kenney (www.kenney.nl), CC0 1.0
+http://creativecommons.org/publicdomain/zero/1.0/
+
+shuffle.mp3 = card-shuffle.ogg (แปลงเป็น MP3 ให้ Safari เล่นได้)
+card.mp3, draw.mp3 = card-place-1.ogg
