@@ -67,7 +67,7 @@ const TUNE = {
   card: { rate: 1.25, gain: 0.6 },
   draw: { rate: 1.25, gain: 0.6 },
   ghost: { rate: 1.25, gain: 0.5 },
-  nope: { rate: 1, gain: 0.3 },        // เสียง wrong ต้นฉบับดังมาก เลยเบาไว้
+  nope: { rate: 1, gain: 0.2 },       // เสียง wrong ต้นฉบับดังมาก เลยเบาไว้
   talisman: { rate: 1, gain: 0.9 },    // เสียง holy ต้นฉบับค่อนข้างเบา
 };
 
