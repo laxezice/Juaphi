@@ -2,6 +2,7 @@
 import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
 import { CARD_INFO, KIND_ORDER, describeSelection, deckCount } from './cards.js';
 import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
+import * as sound from './sound.js';
 
 const $ = (id) => document.getElementById(id);
 const NOPE_MS = 3000;
@@ -557,6 +558,37 @@ function openCombos() {
   });
 }
 
+// ---------- เสียง ----------
+// ไอคอนลำโพง: มีคลื่นเสียง = เปิด, มีกากบาท = ปิด
+const SPEAKER = '<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>';
+const ICON_ON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' + SPEAKER
+  + '<path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const ICON_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' + SPEAKER
+  + '<path d="M16.5 9.5l5 5M21.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+function renderMute() {
+  const off = sound.isMuted();
+  const b = $('mute-btn');
+  b.innerHTML = off ? ICON_OFF : ICON_ON;
+  b.setAttribute('aria-label', off ? 'เปิดเสียง' : 'ปิดเสียง');
+  b.title = off ? 'เปิดเสียง' : 'ปิดเสียง';
+  b.classList.toggle('muted', off);
+}
+
+/** เสียงตามเหตุการณ์ในเกม */
+function soundFor(e) {
+  switch (e.type) {
+    case 'play': e.kinds.forEach((_, i) => sound.play('card', { delay: i * 0.09 })); break;
+    case 'nope': sound.play('card', { gain: 1.15 }); break;
+    case 'draw': sound.play('draw'); break;
+    case 'wind': sound.play('shuffle'); break;
+    case 'insert': case 'grudge': sound.play('card'); break;
+    case 'give': case 'steal': if (!e.empty) sound.play('card'); break;
+    case 'demand': if (e.got) sound.play('card'); break;
+    default:
+  }
+}
+
 // ---------- เริ่มต้น ----------
 /** ฉาก 3 มิติโหลดเสร็จ เปลี่ยนจากการ์ด HTML เป็นการ์ดบนโต๊ะ */
 export function attachScene(api) {
@@ -574,6 +606,10 @@ export function initUI() {
   $('lobby-leave').onclick = () => leaveRoom();
   $('game-leave').onclick = () => { if (confirm('ออกจากห้อง? ถ้าเกมกำลังเล่นอยู่ คุณจะตกรอบ')) { $('menu').hidden = true; leaveRoom(); } };
   $('menu-btn').onclick = () => { $('menu').hidden = !$('menu').hidden; };
+  $('mute-btn').onclick = () => { sound.setMuted(!sound.isMuted()); renderMute(); };
+  renderMute();
+  // เบราว์เซอร์อนุญาตเสียงหลังผู้ใช้แตะหน้าจอ
+  document.addEventListener('pointerdown', () => sound.unlock(), { passive: true });
   $('cards-btn').onclick = () => { $('menu').hidden = true; openCardList(); };
   $('combo-btn').onclick = () => { $('menu').hidden = true; openCombos(); };
   $('panel-close').onclick = () => closePanel();
@@ -617,6 +653,7 @@ export function initUI() {
     const text = describe(e, you, nameOf);
     if (text) log(text);
     chainEvent(e);
+    soundFor(e);
     if (e.type === 'mirror' && e.player === you && e.cards) showMirror(e.cards);
     if (scene) scene.playEvent(e, S());
   });

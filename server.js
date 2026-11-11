@@ -34,6 +34,9 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.webp': 'image/webp',
+  '.ogg': 'audio/ogg',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
@@ -72,6 +75,13 @@ const server = http.createServer((req, res) => {
     // ไฟล์ภาพการ์ดที่มีอยู่จริงใน public/cards (.webp หรือ .png) หน้าเว็บจะได้ไม่ต้องลองโหลดไฟล์ที่ไม่มี
     let names = [];
     try { names = fs.readdirSync(path.join(PUBLIC, 'cards')).filter((f) => /\.(webp|png)$/.test(f)); } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(names));
+  }
+  if (p === '/api/sounds') {
+    // ไฟล์เสียงที่มีอยู่ใน public/sounds (ไม่มีไฟล์ไหน หน้าเว็บใช้เสียงสังเคราะห์แทน)
+    let names = [];
+    try { names = fs.readdirSync(path.join(PUBLIC, 'sounds')).filter((f) => /\.(ogg|mp3|wav)$/.test(f)); } catch {}
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(names));
   }

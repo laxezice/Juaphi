@@ -268,3 +268,7 @@ body.chain-open .log, body.tray-open .chain { visibility: hidden; }
   fill: none; stroke: #ffe1d8; stroke-width: 5.5; stroke-linecap: round;
   stroke-dasharray: 289.03; stroke-dashoffset: 0; filter: drop-shadow(0 0 4px rgba(255, 80, 60, 0.95));
 }
+
+/* ---------- ปุ่มไอคอนเปิด/ปิดเสียงข้างเมนู ---------- */
+.icon-btn { display: inline-grid; place-items: center; width: 40px; padding: 0; color: var(--text); }
+.icon-btn.muted { color: var(--muted); }

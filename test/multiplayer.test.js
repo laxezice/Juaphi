@@ -256,6 +256,21 @@ test('opening the same seat in another tab tells the old tab it was replaced', a
   await waitFor(() => a.msgs.some(({ m }) => m.t === 'replaced'));
 });
 
+test('/api/sounds lists the sound files that exist', async (t) => {
+  const srv = await startServer(t);
+  const fs = require('node:fs');
+  const dir = path.join(__dirname, '..', 'public', 'sounds');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, 'zz-test.ogg');
+  fs.writeFileSync(file, 'x');
+  t.after(() => fs.rmSync(file, { force: true }));
+  const list = await (await fetch(`http://127.0.0.1:${srv.port}/api/sounds`)).json();
+  assert.ok(Array.isArray(list));
+  assert.ok(list.includes('zz-test.ogg'));
+  const r = await fetch(`http://127.0.0.1:${srv.port}/sounds/zz-test.ogg`);
+  assert.equal(r.headers.get('content-type'), 'audio/ogg');
+});
+
 test('/api/art lists the card images that exist, and three.js is served', async (t) => {
   const srv = await startServer(t);
   const fs = require('node:fs');
