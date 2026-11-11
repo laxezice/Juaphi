@@ -211,6 +211,68 @@ function resolvePending(g, rng) {
   return done(events);
 }
 
+function doGrudge(g, me, targetId, rng) {
+  if (me.alive) return fail('ใช้อาฆาตได้เฉพาะตอนเป็นวิญญาณ');
+  if (!me.grudge) return fail('ใช้อาฆาตไปแล้ว');
+  if (g.pending) return fail('รอให้เรื่องตรงหน้าจบก่อน');
+  const t = find(g, targetId);
+  if (!t || !t.alive) return fail('เลือกคนที่ยังรอดอยู่');
+  if (!t.hand.length) return fail('คนนี้ไม่มีการ์ดในมือ');
+  const card = t.hand.splice(randomIndex(t.hand.length, rng), 1)[0];
+  g.discard.push(card);
+  me.grudge = false;
+  return done([{ type: 'grudge', from: me.id, to: t.id, card }]);
+}
+
+/** คนที่เกมรออยู่ (ถึงตา, ต้องเสียบผี, ต้องให้การ์ด) null ระหว่างช่วงเวลา "ไม่!" หรือเกมจบ */
+function waitingOn(g) {
+  if (g.winner) return null;
+  const pd = g.pending;
+  if (!pd) return g.current;
+  if (pd.kind === 'insert') return pd.player;
+  if (pd.kind === 'give') return pd.from;
+  return null;
+}
+
+/** ระบบทำแทนคนที่เกมรออยู่ (หลุดนานเกินไป) */
+function autoAct(g, rng) {
+  const id = waitingOn(g);
+  if (!id) return fail('ไม่มีใครให้ทำแทน');
+  const me = find(g, id);
+  const pd = g.pending;
+  if (pd && pd.kind === 'insert') return doInsert(g, me, randomIndex(g.deck.length + 1, rng));
+  if (pd && pd.kind === 'give') return doGive(g, me, me.hand[randomIndex(me.hand.length, rng)].uid);
+  return doDraw(g, me);
+}
+
+/** คนออกจากห้องหรือโดนเตะกลางเกม */
+function removePlayer(g, id, rng) {
+  const p = find(g, id);
+  if (!p || !p.alive || g.winner) return [];
+  const events = [];
+  const pd = g.pending;
+  if (pd && pd.kind === 'window' && pd.actor === id) {
+    g.pending = null;
+    events.push({ type: 'resolve', player: id, kinds: pd.play.cards.map((c) => c.kind), cancelled: true });
+  } else if (pd && pd.kind === 'give' && pd.from === id) {
+    if (p.hand.length) events.push(...doGive(g, p, p.hand[randomIndex(p.hand.length, rng)].uid).events);
+    g.pending = null;
+  } else if (pd && pd.kind === 'insert' && pd.player === id) {
+    g.deck.splice(randomIndex(g.deck.length + 1, rng), 0, pd.ghost);
+    g.pending = null;
+  }
+  g.discard.push(...p.hand);
+  p.hand = [];
+  p.alive = false;
+  p.grudge = false;
+  const ghosts = g.deck.map((c, i) => (c.kind === 'ghost' ? i : -1)).filter((i) => i >= 0);
+  if (ghosts.length) g.deck.splice(ghosts[randomIndex(ghosts.length, rng)], 1);
+  events.push({ type: 'left', player: id });
+  checkWinner(g, events);
+  if (!g.winner && g.current === id) passTurn(g, nextAlive(g, id), 1, false);
+  return events;
+}
+
 /** @returns {{ok:true, events:object[]} | {ok:false, error:string}} */
 function act(g, playerId, action, rng) {
   if (!action || typeof action.type !== 'string') return fail('คำสั่งไม่ถูกต้อง');
@@ -231,9 +293,11 @@ function act(g, playerId, action, rng) {
       return doNope(g, me, action.uid);
     case 'give':
       return doGive(g, me, action.uid);
+    case 'grudge':
+      return doGrudge(g, me, action.target, rng);
     default:
       return fail('คำสั่งไม่ถูกต้อง');
   }
 }
 
-module.exports = { createGame, act, resolvePending, nextAlive, ALL_KINDS };
+module.exports = { createGame, act, resolvePending, removePlayer, waitingOn, autoAct, nextAlive, ALL_KINDS };
