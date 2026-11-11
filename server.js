@@ -46,6 +46,13 @@ const server = http.createServer((req, res) => {
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { p = '/'; }
   if (p === '/') p = '/index.html';
   if (p === '/healthz') { res.writeHead(200); return res.end('ok'); }
+  if (p === '/api/art') {
+    // ภาพการ์ดที่มีอยู่จริงใน public/cards หน้าเว็บจะได้ไม่ต้องลองโหลดไฟล์ที่ไม่มี
+    let names = [];
+    try { names = fs.readdirSync(path.join(PUBLIC, 'cards')).filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -4)); } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(names));
+  }
   if (p === '/vendor/three.module.js' || p === '/vendor/three.core.js') return serveFile(res, path.join(VENDOR, path.basename(p)));
   const file = path.normalize(path.join(PUBLIC, p));
   if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403); return res.end(); }

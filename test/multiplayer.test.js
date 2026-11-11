@@ -66,6 +66,21 @@ async function setupRoom(srv, names) {
   return [host, ...rest];
 }
 
+test('/api/art lists the card images that exist, and three.js is served', async (t) => {
+  const srv = await startServer(t);
+  const fs = require('node:fs');
+  const file = path.join(__dirname, '..', 'public', 'cards', 'zz-test.png');
+  fs.writeFileSync(file, 'x');
+  t.after(() => fs.rmSync(file, { force: true }));
+  const art = await (await fetch(`http://127.0.0.1:${srv.port}/api/art`)).json();
+  assert.ok(Array.isArray(art));
+  assert.ok(art.includes('zz-test'));
+  const three = await fetch(`http://127.0.0.1:${srv.port}/vendor/three.module.js`);
+  assert.equal(three.status, 200);
+  const evil = await fetch(`http://127.0.0.1:${srv.port}/..%2fpackage.json`);
+  assert.notEqual(evil.status, 200);
+});
+
 test('room list shows open rooms live, and a started game deals private hands', async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '50' });
   const a = await srv.client('A');

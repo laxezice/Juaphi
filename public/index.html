@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0a12">
+  <title>จั่วผี</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "/vendor/three.module.js" } }</script>
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <!-- หน้าแรก -->
+  <main id="home" class="screen" hidden>
+    <h1 class="logo">จั่วผี</h1>
+    <p class="tag">จั่วการ์ดไปเรื่อยๆ ใครจั่วได้ <b>ผี</b> แล้วไม่มี <b>ยันต์</b> ตกรอบ คนสุดท้ายที่รอดชนะ</p>
+    <label class="field">ชื่อของคุณ
+      <input id="name" maxlength="20" autocomplete="nickname" placeholder="เช่น ต้น">
+    </label>
+    <button id="create" class="btn primary">สร้างห้องใหม่</button>
+    <section class="rooms">
+      <h2>ห้องที่เปิดอยู่</h2>
+      <ul id="room-list"></ul>
+      <p id="no-rooms" class="muted">ยังไม่มีห้องเปิดอยู่ สร้างห้องแล้วชวนเพื่อนได้เลย</p>
+    </section>
+  </main>
+
+  <!-- ห้องรอ -->
+  <main id="lobby" class="screen" hidden>
+    <header class="bar">
+      <div><div id="lobby-name" class="title"></div><div class="muted">รหัสห้อง <b id="lobby-code"></b></div></div>
+      <button id="lobby-leave" class="btn ghost small">ออกจากห้อง</button>
+    </header>
+    <button id="invite" class="btn">คัดลอกลิงก์เชิญ</button>
+    <ul id="lobby-players" class="players"></ul>
+    <p id="lobby-hint" class="muted"></p>
+    <button id="start" class="btn primary" hidden>เริ่มเกม</button>
+  </main>
+
+  <!-- ในเกม -->
+  <section id="game" class="screen" hidden>
+    <header class="hud">
+      <div id="turn" class="turn"></div>
+      <button id="menu-btn" class="btn ghost small" aria-haspopup="true">เมนู</button>
+    </header>
+    <div id="menu" class="menu" hidden>
+      <div id="menu-players"></div>
+      <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
+    </div>
+    <div id="log" class="log" aria-live="polite"></div>
+    <div id="hand" class="hand" hidden></div>
+    <footer class="actions">
+      <div id="prompt" class="prompt"></div>
+      <div id="window-bar" class="window-bar" hidden><span></span></div>
+      <div class="row">
+        <button id="nope" class="btn nope" hidden>ไม่!</button>
+        <button id="play" class="btn primary" hidden></button>
+        <button id="draw" class="btn draw" hidden>จั่ว</button>
+        <button id="grudge" class="btn ghostly" hidden>อาฆาต</button>
+      </div>
+    </footer>
+    <div id="winner" class="winner" hidden>
+      <div class="winner-box">
+        <div id="winner-text"></div>
+        <button id="again" class="btn primary" hidden>เล่นอีกรอบ</button>
+        <p id="again-hint" class="muted"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- กล่องเลือก -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true">
+      <div id="modal-title" class="title"></div>
+      <div id="modal-body"></div>
+      <button id="modal-cancel" class="btn ghost small">ยกเลิก</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="conn" class="conn" hidden>กำลังเชื่อมต่อใหม่…</div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
