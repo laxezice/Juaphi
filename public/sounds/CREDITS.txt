@@ -1,12 +1,13 @@
-Sounds in this folder: Casino Audio 1.1 by Kenney (www.kenney.nl), CC0 1.0
-http://creativecommons.org/publicdomain/zero/1.0/
+ที่มาของเสียงในโฟลเดอร์นี้ (ใช้เป็นเสียงประกอบในเกมจั่วผีเท่านั้น)
 
-shuffle.mp3 = card-shuffle.ogg (แปลงเป็น MP3 ให้ Safari เล่นได้)
+== Kenney: Casino Audio 1.1 (www.kenney.nl) ==
+สัญญาอนุญาต CC0 1.0 http://creativecommons.org/publicdomain/zero/1.0/
+shuffle.mp3        = card-shuffle.ogg (แปลงเป็น MP3 ให้ Safari เล่นได้)
 card.mp3, draw.mp3 = card-place-1.ogg
 
-ghost.mp3 = "Scary Female Halloween Horror Laughter Vol 006" by alesiadavina (Pixabay, id 165223)
-           Pixabay Content License https://pixabay.com/service/license-summary/
-           ตัดความเงียบท้ายและใส่ fade out แล้ว ใช้เป็นเสียงประกอบในเกมเท่านั้น
-
-nope.mp3     = wrong.mp3 จากผู้ใช้ (ที่มาไม่ระบุ) ตัดช่วงเงียบด้านหน้าออก
-talisman.mp3 = holy.mp3 จากผู้ใช้ (ที่มาไม่ระบุ) ตัดช่วงเงียบหัวท้ายและใส่ fade out
+== Pixabay ==
+สัญญาอนุญาต Pixabay Content License https://pixabay.com/service/license-summary/
+ghost.mp3    = "Scary Female Halloween Horror Laughter Vol 006" by alesiadavina (Pixabay id 165223)
+               ตัดความเงียบท้ายและใส่ fade out
+nope.mp3     = wrong.mp3 (ไฟล์ถูกเปลี่ยนชื่อมา ไม่ทราบชื่อผู้สร้าง) ตัดช่วงเงียบด้านหน้าออก
+talisman.mp3 = holy.mp3 (ไฟล์ถูกเปลี่ยนชื่อมา ไม่ทราบชื่อผู้สร้าง) ตัดช่วงเงียบหัวท้ายและใส่ fade out
