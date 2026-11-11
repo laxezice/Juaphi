@@ -28,6 +28,7 @@ async function run(who, saved) {
   $('reveal-face').src = ghostUrl;
   $('reveal-back').src = backSrc;
   tal.querySelector('img').src = talUrl;
+  $('reveal-name').textContent = who;     // ชื่อคนที่จั่ว เห็นตั้งแต่ก่อนพลิก
   $('reveal-text').textContent = '';
   $('reveal-sub').textContent = '';
   box.className = 'reveal';
@@ -41,16 +42,17 @@ async function run(who, saved) {
   if (!saved) sound.play('ghost');         // มียันต์ ไม่ต้องหัวเราะ เดี๋ยวมีเสียง holy
   box.classList.add('scare');              // แสงแดงวาบ จอสั่น
   document.body.classList.add('shake');
-  $('reveal-text').textContent = who === 'คุณ' ? 'คุณจั่วได้ผี!' : `${who} จั่วได้ผี!`;
   await wait(650);
   document.body.classList.remove('shake');
   if (saved) {
     box.classList.add('saved');            // ยันต์พุ่งเข้ามาปัดเป่า
     sound.play('talisman');
-    $('reveal-sub').textContent = 'แต่ยันต์ช่วยไว้ทัน';
+    $('reveal-text').textContent = 'ยันต์ช่วยไว้ทัน!';
+    $('reveal-sub').textContent = who === 'คุณ' ? 'คุณรอด เลือกที่ซ่อนผีกลับเข้ากอง' : `${who} รอด แล้วจะแอบซ่อนผีกลับเข้ากอง`;
   } else {
     box.classList.add('dead');
-    $('reveal-sub').textContent = 'โดนผีหลอก ตกรอบ!';
+    $('reveal-text').textContent = 'ตกรอบ!';
+    $('reveal-sub').textContent = who === 'คุณ' ? 'คุณกลายเป็นวิญญาณ ยังใช้อาฆาตได้ 1 ครั้ง' : `${who} กลายเป็นวิญญาณ`;
   }
   await wait(1500);
   box.classList.add('out');

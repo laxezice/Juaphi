@@ -66,7 +66,7 @@ const TUNE = {
   shuffle: { rate: 2, gain: 1 },
   card: { rate: 1.25, gain: 0.6 },
   draw: { rate: 1.25, gain: 0.6 },
-  ghost: { rate: 1.25, gain: 0.5 },
+  ghost: { rate: 1.5, gain: 0.4 },    // เสียงกรี๊ด (freesound_community) เร่ง ×1.5
   nope: { rate: 1.5, gain: 0.1 },     // เสียง wrong: ตัดเหลือ 0.45 วิ แล้วเร่ง ×1.5 ต้นฉบับดังมากเลยเบาไว้
   talisman: { rate: 1, gain: 0.9 },    // เสียง holy ต้นฉบับค่อนข้างเบา
 };

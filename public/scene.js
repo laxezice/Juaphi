@@ -112,9 +112,21 @@ export async function createScene(canvas, hooks) {
 
   // ---------- การ์ด ----------
   const planeGeo = new THREE.PlaneGeometry(CW, CH);
-  const backMat = new THREE.MeshStandardMaterial({ map: tex.back, roughness: 0.6 });
+  // การ์ดวาดแบบมุมโค้ง ส่วนนอกมุมโปร่งใส alphaTest ตัดทิ้งไป ไม่อย่างนั้นมุมจะเป็นสีดำ
+  const backMat = new THREE.MeshStandardMaterial({ map: tex.back, roughness: 0.6, alphaTest: 0.5 });
   const faceMats = {};
-  const faceMat = (k) => (faceMats[k] ||= new THREE.MeshStandardMaterial({ map: tex[k], roughness: 0.55 }));
+  const faceMat = (k) => (faceMats[k] ||= new THREE.MeshStandardMaterial({ map: tex[k], roughness: 0.55, alphaTest: 0.5 }));
+  // ด้านบนของกองจั่ว (กล่องทึบ): หลังการ์ดที่เติมมุมด้วยสีกระดาษเดียวกับขอบกอง จะได้ไม่มองทะลุกล่อง
+  const deckTopCanvas = document.createElement('canvas');
+  deckTopCanvas.width = backCanvas.width;
+  deckTopCanvas.height = backCanvas.height;
+  {
+    const ctx = deckTopCanvas.getContext('2d');
+    ctx.fillStyle = '#d8ccb0';
+    ctx.fillRect(0, 0, deckTopCanvas.width, deckTopCanvas.height);
+    ctx.drawImage(backCanvas, 0, 0);
+  }
+  const deckTopMat = new THREE.MeshStandardMaterial({ map: toTex(deckTopCanvas), roughness: 0.6 });
 
   /** การ์ดสองหน้า หันหน้าขึ้นฟ้าเมื่อวางราบ (rotation.x = -PI/2) */
   function makeCard(kind) {
@@ -135,7 +147,7 @@ export async function createScene(canvas, hooks) {
     new THREE.BoxGeometry(CW, 1, CH),
     [
       new THREE.MeshStandardMaterial({ color: 0xd8ccb0 }), new THREE.MeshStandardMaterial({ color: 0xd8ccb0 }),
-      backMat, new THREE.MeshStandardMaterial({ color: 0x20141a }),
+      deckTopMat, new THREE.MeshStandardMaterial({ color: 0x20141a }),
       new THREE.MeshStandardMaterial({ color: 0xd8ccb0 }), new THREE.MeshStandardMaterial({ color: 0xd8ccb0 }),
     ],
   );
@@ -404,6 +416,9 @@ export async function createScene(canvas, hooks) {
         return;
       }
       case 'ghost': {
+        // วงแดงกะพริบรอบที่นั่งของคนที่จั่วได้ผี ให้รู้ว่าเป็นใคร
+        const st = seats.get(e.player);
+        if (st) st.alertUntil = performance.now() + 3600;
         // ฉากเปิดการ์ดผีใหญ่อยู่ใน HTML (reveal.js) ที่นี่แค่ให้ไฟวูบ แล้วการ์ดบินไปที่ของมัน
         if (!reduced) {
           await tween(400, (t) => { candleDim = 1 - 0.7 * ease(t); });
@@ -557,7 +572,12 @@ export async function createScene(canvas, hooks) {
       c.flame.scale.set(0.32 * f, 0.5 * f * (0.6 + 0.4 * candleDim), 1);
     }
     mainLight.intensity = 1.8 * (0.35 + 0.65 * candleDim);   // ผีโผล่ ไฟวูบ
-    for (const st of seats.values()) if (st.current) st.ring.material.opacity = 0.6 + 0.3 * Math.sin(now / 300);
+    for (const st of seats.values()) {
+      const alert = st.alertUntil > now;
+      st.ring.material.color.setHex(alert ? 0xff3b3b : 0xffc35a);
+      if (alert) { st.ring.material.opacity = 0.55 + 0.45 * Math.abs(Math.sin(now / 160)); st.ring.scale.setScalar(1.15); }
+      else { st.ring.scale.setScalar(1); if (st.current) st.ring.material.opacity = 0.6 + 0.3 * Math.sin(now / 300); else st.ring.material.opacity = 0; }
+    }
     // การ์ดในมือเลื่อนเข้าที่
     for (const m of handCards.values()) {
       if (!m.userData.target) continue;
