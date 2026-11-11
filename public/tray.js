@@ -77,6 +77,64 @@ export function openTray({ key, title, detail = '', tagText = 'เลือก�
   });
 }
 
+/**
+ * แถวเรียงลำดับการ์ด: แตะการ์ดตามลำดับที่ต้องการ ตัวเลขบนการ์ดคือลำดับ (1 = แรกสุด)
+ * ใบที่ยังไม่ได้แตะต่อท้ายตามลำดับเดิม (เลขจาง) แตะซ้ำ = เอาออก ปุ่มซ้าย = เริ่มใหม่
+ * คืน key ทุกใบตามลำดับใหม่ หรือ null ถ้าถูกปิด
+ */
+export function openOrderTray({ key, title, detail = '', tagText = 'เรียงการ์ด', cards }) {
+  closeTray();
+  $('tray-tag').textContent = tagText;
+  $('tray-title').textContent = title;
+  $('tray-detail').textContent = detail;
+  $('tray-detail').hidden = !detail;
+  const row = $('tray-cards');
+  row.innerHTML = '';
+  let chosen = [];
+  const order = () => [...chosen, ...cards.map((c) => c.key).filter((k) => !chosen.includes(k))];
+  const ok = $('tray-ok');
+  const reset = $('tray-cancel');
+  const els = cards.map((c, i) => {
+    const el = cardEl(c.kind, { tag: c.tag, cls: 'pickable' });
+    el.dataset.key = String(c.key);
+    el.style.animationDelay = `${Math.min(i, 10) * 25}ms`;
+    const num = document.createElement('span');
+    num.className = 'torder';
+    el.append(num);
+    el.onclick = () => {
+      const at = chosen.indexOf(c.key);
+      if (at >= 0) chosen.splice(at, 1); else chosen.push(c.key);
+      refresh();
+    };
+    row.append(el);
+    return el;
+  });
+  function refresh() {
+    const o = order();
+    els.forEach((el, i) => {
+      const k = cards[i].key;
+      const set = chosen.includes(k);
+      const num = el.querySelector('.torder');
+      num.textContent = String(o.indexOf(k) + 1);
+      num.classList.toggle('set', set);
+      el.classList.toggle('selected', set);
+    });
+    ok.textContent = chosen.length ? 'ยืนยันลำดับนี้' : 'คงลำดับเดิม';
+    ok.disabled = false;
+    reset.hidden = !chosen.length;
+  }
+  reset.textContent = 'เริ่มใหม่';
+  $('tray-layer').hidden = false;
+  document.body.classList.add('tray-open');
+  refresh();
+  listener(true);
+  return new Promise((resolve) => {
+    current = { key, resolve };
+    ok.onclick = () => finish(order());
+    reset.onclick = () => { chosen = []; refresh(); };
+  });
+}
+
 function finish(value) {
   const c = current;
   current = null;

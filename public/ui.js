@@ -1,7 +1,7 @@
 // หน้าจอทั้งหมดที่เป็น HTML: หน้าแรก ห้องรอ ปุ่มในเกม กล่องเลือก และบันทึกเหตุการณ์
 import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
 import { CARD_INFO, KIND_ORDER, EXTRA_KINDS, kindsFor, describeSelection, deckCount } from './cards.js';
-import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
+import { openTray, openOrderTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
 import * as sound from './sound.js';
 import { revealGhost } from './reveal.js';
 
@@ -261,35 +261,16 @@ function openDig(g) {
   }).then((uid) => { if (uid) act({ type: 'dig', uid }); });
 }
 
-/** ผูกดวง: เลือกทีละใบว่าใบไหนอยู่บนสุด ใบถัดไป ... ใบสุดท้ายเหลือใบเดียวก็อยู่ล่าง */
-let fateBusy = false;
-async function openFate(g) {
-  fateBusy = true;
+/** ผูกดวง: แตะการ์ดตามลำดับที่อยากให้อยู่จากบนลงล่าง ตัวเลขบนการ์ด = ลำดับใหม่ */
+function openFate(g) {
   const top = g.me.fate;
-  const label = (c) => `เดิมใบที่ ${top.indexOf(c) + 1}`;
-  const order = [];
-  let left = [...top];
-  try {
-    while (left.length > 1) {
-      const i = order.length;
-      const uid = await openTray({
-        key: 'fate',
-        tagText: 'ผูกดวง',
-        title: i === 0 ? 'เลือกใบที่จะให้อยู่บนสุด' : `เลือกใบที่ ${i + 1} จากบน`,
-        detail: `${top.length} ใบบนกอง เห็นแค่คุณคนเดียว · เรียงแล้ว: ${order.length ? order.map((c) => cardName(c.kind)).join(' → ') : '-'}`,
-        cards: left.map((c) => ({ kind: c.kind, key: c.uid, tag: label(c) })),
-        confirm: (c) => `ให้ ${cardName(c.kind)} เป็นใบที่ ${i + 1}`,
-        cancel: null,
-      });
-      if (!uid) return;   // แถวถูกปิดเพราะสถานการณ์เปลี่ยน
-      order.push(left.find((c) => c.uid === uid));
-      left = left.filter((c) => c.uid !== uid);
-    }
-    order.push(...left);
-    act({ type: 'fate', order: order.map((c) => c.uid) });
-  } finally {
-    fateBusy = false;
-  }
+  openOrderTray({
+    key: 'fate',
+    tagText: 'ผูกดวง',
+    title: `เรียงการ์ด ${top.length} ใบบนกองใหม่`,
+    detail: 'แตะการ์ดตามลำดับที่อยากให้อยู่จากบนลงล่าง เลข 1 = บนสุด (ใบที่จะถูกจั่วต่อไป) · เห็นแค่คุณคนเดียว',
+    cards: top.map((c, i) => ({ kind: c.kind, key: c.uid, tag: `เดิมใบที่ ${i + 1}` })),
+  }).then((order) => { if (order) act({ type: 'fate', order }); });
 }
 
 async function doGrudge() {
@@ -561,7 +542,7 @@ function renderGame(s) {
   else if (trayKey() === 'give') closeTray();
   if (pd && pd.kind === 'dig' && pd.player === you && me.dig) { if (trayKey() !== 'dig') openDig(g); }
   else if (trayKey() === 'dig') closeTray();
-  if (pd && pd.kind === 'fate' && pd.player === you && me.fate) { if (!fateBusy) openFate(g); }
+  if (pd && pd.kind === 'fate' && pd.player === you && me.fate) { if (trayKey() !== 'fate') openFate(g); }
   else if (trayKey() === 'fate') closeTray();
   // ทวงการ์ดค้างอยู่แต่มีเรื่องแทรกหรือหมดตา ปิดแถว
   if (trayKey() === 'name' && (pd || g.winner || !mine)) closeTray();

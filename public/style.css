@@ -507,3 +507,12 @@ body.shake #game, body.shake .reveal-card { animation: shake 0.5s linear; }
 .draw-turns.bump { animation: draw-bump 0.5s ease-out; }
 @keyframes draw-bump { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .draw-turns.bump { animation: none; } }
+
+/* แถวเรียงลำดับ (ผูกดวง): เลขลำดับบนการ์ด จาง = ลำดับเดิม, ทอง = แตะเลือกแล้ว */
+.tcard .torder {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center; font: 600 28px/1 'Mitr', sans-serif; color: rgba(255, 255, 255, 0.75);
+  background: rgba(14, 12, 24, 0.6); border: 2px dashed rgba(255, 255, 255, 0.5); pointer-events: none; transition: transform 0.15s;
+}
+.tcard .torder.set { color: #2a1a00; background: #ffd23f; border: 3px solid #fff3c4; box-shadow: 0 0 14px rgba(255, 210, 63, 0.95); animation: torder-in 0.25s ease-out; }
+@keyframes torder-in { from { transform: translateX(-50%) scale(0.4); } to { transform: translateX(-50%) scale(1); } }
