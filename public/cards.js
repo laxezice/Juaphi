@@ -24,9 +24,17 @@ export const CARD_W = 500;
 export const CARD_H = 700; // 5:7
 
 let artList = null;
+/** id การ์ด -> ชื่อไฟล์ภาพ ถ้ามีทั้ง .webp และ .png ใช้ .webp เพราะเล็กกว่ามาก */
 async function availableArt() {
   if (!artList) {
-    artList = fetch('/api/art').then((r) => r.json()).then((a) => new Set(a)).catch(() => new Set());
+    artList = fetch('/api/art').then((r) => r.json()).then((files) => {
+      const map = new Map();
+      for (const f of files) {
+        const [id, ext] = f.split('.');
+        if (!map.has(id) || ext === 'webp') map.set(id, f);
+      }
+      return map;
+    }).catch(() => new Map());
   }
   return artList;
 }
@@ -81,7 +89,8 @@ export async function drawCardFace(kind) {
   const c = document.createElement('canvas');
   c.width = CARD_W; c.height = CARD_H;
   const ctx = c.getContext('2d');
-  const art = (await availableArt()).has(kind) ? await loadImage(`/cards/${kind}.png`) : null;
+  const file = (await availableArt()).get(kind);
+  const art = file ? await loadImage(`/cards/${file}`) : null;
 
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 36);
   ctx.save();
@@ -155,7 +164,8 @@ export async function drawCardBack() {
   const c = document.createElement('canvas');
   c.width = CARD_W; c.height = CARD_H;
   const ctx = c.getContext('2d');
-  const art = (await availableArt()).has('back') ? await loadImage('/cards/back.png') : null;
+  const backFile = (await availableArt()).get('back');
+  const art = backFile ? await loadImage(`/cards/${backFile}`) : null;
   roundRect(ctx, 0, 0, CARD_W, CARD_H, 36);
   ctx.clip();
   if (art) { ctx.drawImage(art, 0, 0, CARD_W, CARD_H); return c; }

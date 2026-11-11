@@ -175,12 +175,15 @@ test('opening the same seat in another tab tells the old tab it was replaced', a
 test('/api/art lists the card images that exist, and three.js is served', async (t) => {
   const srv = await startServer(t);
   const fs = require('node:fs');
-  const file = path.join(__dirname, '..', 'public', 'cards', 'zz-test.png');
-  fs.writeFileSync(file, 'x');
-  t.after(() => fs.rmSync(file, { force: true }));
+  const dir = path.join(__dirname, '..', 'public', 'cards');
+  for (const f of ['zz-test.png', 'zz-test2.webp']) fs.writeFileSync(path.join(dir, f), 'x');
+  t.after(() => ['zz-test.png', 'zz-test2.webp'].forEach((f) => fs.rmSync(path.join(dir, f), { force: true })));
   const art = await (await fetch(`http://127.0.0.1:${srv.port}/api/art`)).json();
   assert.ok(Array.isArray(art));
-  assert.ok(art.includes('zz-test'));
+  assert.ok(art.includes('zz-test.png'));
+  assert.ok(art.includes('zz-test2.webp'));
+  const webp = await fetch(`http://127.0.0.1:${srv.port}/cards/zz-test2.webp`);
+  assert.equal(webp.headers.get('content-type'), 'image/webp');
   const three = await fetch(`http://127.0.0.1:${srv.port}/vendor/three.module.js`);
   assert.equal(three.status, 200);
   const evil = await fetch(`http://127.0.0.1:${srv.port}/..%2fpackage.json`);
