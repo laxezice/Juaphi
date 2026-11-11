@@ -4,6 +4,7 @@ import { CARD_INFO, KIND_ORDER, describeSelection } from './cards.js';
 
 const $ = (id) => document.getElementById(id);
 const NOPE_MS = 3000;
+const MAX_SEATS = 8;   // ต้องตรงกับ server.js
 let scene = null;
 let selected = new Set();
 let modalKey = null;      // กล่องที่เปิดอยู่เพื่อเรื่องอะไร
@@ -263,14 +264,18 @@ function renderLobby(s) {
   for (const p of s.room.players) {
     const li = document.createElement('li');
     if (!p.online) li.className = 'offline';
-    li.innerHTML = `<span>${esc(p.name)}${p.id === s.room.hostId ? ' 👑' : ''}${p.id === s.you ? ' (คุณ)' : ''}${p.online ? '' : ' · หลุด'}</span>`;
-    if (isHost && p.id !== s.you) li.append(chip('เตะ', () => send({ t: 'kick', id: p.id })));
+    li.innerHTML = `<span>${esc(p.name)}${p.bot ? ' <span class="badge">บอต</span>' : ''}${p.id === s.room.hostId ? ' 👑' : ''}${p.id === s.you ? ' (คุณ)' : ''}${p.online ? '' : ' · หลุด'}</span>`;
+    if (isHost && p.id !== s.you) li.append(chip(p.bot ? 'เอาออก' : 'เตะ', () => send({ t: 'kick', id: p.id })));
     ul.append(li);
   }
+  const full = s.room.players.length >= MAX_SEATS;
+  $('add-bot').hidden = !isHost;
+  $('add-bot').disabled = full;
+  $('add-bot').textContent = full ? `ห้องเต็มแล้ว (${MAX_SEATS} ที่)` : 'เพิ่มบอต';
   $('start').hidden = !isHost;
   $('start').disabled = s.room.players.length < 2;
   $('lobby-hint').textContent = isHost
-    ? (s.room.players.length < 2 ? 'รอเพื่อนอย่างน้อยอีก 1 คน' : `พร้อมแล้ว ${s.room.players.length} คน`)
+    ? (s.room.players.length < 2 ? 'รอเพื่อนอย่างน้อยอีก 1 คน หรือเพิ่มบอตมาเล่นด้วย' : `พร้อมแล้ว ${s.room.players.length} คน`)
     : 'รอหัวห้องกดเริ่มเกม';
 }
 
@@ -370,10 +375,12 @@ function renderGame(s) {
   for (const p of s.room.players) {
     const row = document.createElement('div');
     row.className = 'row-p' + (p.online ? '' : ' offline');
-    row.innerHTML = `<span>${esc(p.name)}${p.id === s.room.hostId ? ' 👑' : ''}${p.seat === 'watch' ? ' · ดูอยู่' : ''}${p.online ? '' : ' · หลุด'}</span>`;
-    if (s.room.hostId === you && p.id !== you) row.append(chip('เตะ', () => { if (confirm(`เตะ ${p.name} ออกจากห้อง?`)) send({ t: 'kick', id: p.id }); }));
+    row.innerHTML = `<span>${esc(p.name)}${p.bot ? ' · บอต' : ''}${p.id === s.room.hostId ? ' 👑' : ''}${p.seat === 'watch' ? ' · ดูอยู่' : ''}${p.online ? '' : ' · หลุด'}</span>`;
+    if (s.room.hostId === you && p.id !== you) row.append(chip(p.bot ? 'เอาออก' : 'เตะ', () => { if (confirm(`เอา ${p.name} ออกจากห้อง?`)) send({ t: 'kick', id: p.id }); }));
     mp.append(row);
   }
+  // จบเกมแล้ว หัวห้องเพิ่มบอตก่อนเริ่มรอบใหม่ได้
+  if (s.room.hostId === you && g.winner && s.room.players.length < MAX_SEATS) mp.append(chip('เพิ่มบอต', () => send({ t: 'addBot' })));
 
   renderHand(g);
 }
@@ -409,6 +416,7 @@ export function initUI() {
     catch { prompt('คัดลอกลิงก์นี้', url); }
   };
   $('start').onclick = () => send({ t: 'start' });
+  $('add-bot').onclick = () => send({ t: 'addBot' });
   $('again').onclick = () => send({ t: 'start' });
   $('draw').onclick = () => { selected.clear(); act({ type: 'draw' }); };
   $('play').onclick = () => playSelected();

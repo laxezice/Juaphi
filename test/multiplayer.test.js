@@ -66,6 +66,87 @@ async function setupRoom(srv, names) {
   return [host, ...rest];
 }
 
+// ---------- บอต ----------
+
+/** ผู้เล่นคนจริงแบบง่ายๆ: ถึงตาก็จั่ว ต้องเสียบผีก็เสียบบนสุด ถูกขอก็ให้ใบแรก */
+function autoHuman(p) {
+  const tick = setInterval(() => {
+    const g = p.state && p.state.game;
+    if (!g || g.winner || !g.me) return;
+    const pd = g.pending;
+    if (pd && pd.kind === 'insert' && pd.player === p.id) p.send({ t: 'act', action: { type: 'insert', index: 0 } });
+    else if (pd && pd.kind === 'give' && pd.from === p.id) p.send({ t: 'act', action: { type: 'give', uid: g.me.hand[0].uid } });
+    else if (!pd && g.me.alive && g.current === p.id) p.send({ t: 'act', seq: p.state.seq, action: { type: 'draw' } });
+  }, 40);
+  return () => clearInterval(tick);
+}
+
+test('only the host can add a bot; bots are marked and can be kicked', async (t) => {
+  const srv = await startServer(t);
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  b.send({ t: 'addBot' });
+  await sleep(150);
+  assert.equal(a.state.room.players.length, 2);
+  a.send({ t: 'addBot' });
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.length === 4);
+  const bots = a.state.room.players.filter((p) => p.bot);
+  assert.equal(bots.length, 2);
+  assert.notEqual(bots[0].name, bots[1].name);
+  assert.ok(bots.every((p) => p.online));
+  a.send({ t: 'kick', id: bots[0].id });
+  await waitFor(() => a.state.room.players.length === 3);
+});
+
+test('one person can play a whole game against bots', { timeout: 30000 }, async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '15' });
+  const a = await srv.client('A');
+  a.send({ t: 'create', name: 'A', secret: a.secret });
+  await waitFor(() => a.state);
+  a.send({ t: 'addBot' });
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.length === 3);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  assert.equal(a.state.game.players.length, 3);
+  const stop = autoHuman(a);
+  t.after(stop);
+  await waitFor(() => a.state.game.winner, 25000);
+});
+
+test('bots stop playing while no person in the room is online', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '400' });
+  const a = await srv.client('A');
+  a.send({ t: 'create', name: 'A', secret: a.secret });
+  await waitFor(() => a.state);
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.length === 2);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  a.send({ t: 'act', seq: a.state.seq, action: { type: 'draw' } });
+  await waitFor(() => a.state.game.current !== a.id || a.state.game.pending);
+  const deck = a.state.game.deckCount;
+  const code = a.room;
+  a.ws.close();
+  await sleep(1500);
+  const a2 = await srv.client('A');
+  a2.send({ t: 'join', room: code, name: 'A', secret: a.secret });
+  await waitFor(() => a2.state && a2.state.game);
+  assert.equal(a2.state.game.deckCount, deck, 'the bot must not have drawn while nobody was online');
+});
+
+test('a room left with only bots is closed', async (t) => {
+  const srv = await startServer(t);
+  const a = await srv.client('A');
+  const watcher = await srv.client('W');
+  a.send({ t: 'create', name: 'A', secret: a.secret });
+  await waitFor(() => a.state);
+  a.send({ t: 'addBot' });
+  await waitFor(() => watcher.rooms && watcher.rooms.length === 1);
+  a.send({ t: 'leave' });
+  await waitFor(() => watcher.rooms && watcher.rooms.length === 0);
+});
+
 // ---------- จากการรีวิว ----------
 
 test('a path with a null byte does not crash the server', async (t) => {
@@ -112,7 +193,10 @@ test('a second draw sent with a stale seq is ignored (double-tap while cursed)',
 });
 
 test('each takeover waits a full grace period, even for players offline a long time', async (t) => {
-  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '400' });
+  // กองที่ 3 ใบบนไม่มีผี ไม่อย่างนั้น A อาจจั่วได้ผีแล้วค้างอยู่ที่การเสียบผี
+  let seed = 1;
+  while (createGame(['x', 'y', 'z'], makeRng(seed)).deck.slice(0, 3).some((c) => c.kind === 'ghost')) seed++;
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '400', JUAPHI_SEED: String(seed) });
   const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
   a.send({ t: 'start' });
   await waitFor(() => a.state.game);

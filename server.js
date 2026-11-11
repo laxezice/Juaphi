@@ -11,6 +11,7 @@ const G = require('./game/game');
 const { summarizeRooms, startAdminSocket } = require('./admin');
 const { viewFor } = require('./game/view');
 const { makeRng } = require('./game/deck');
+const { botMove } = require('./game/bot');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -23,6 +24,8 @@ const GRACE_MS = Number(process.env.JUAPHI_GRACE_MS) || 15000; // หลุด�
 const SEED = process.env.JUAPHI_SEED ? Number(process.env.JUAPHI_SEED) : null; // ใช้ในเทสต์เท่านั้น
 const LOBBY_DROP_MS = 60 * 1000;      // หลุดตอนไม่ได้เล่นอยู่นานเท่านี้ ตัดชื่อออก
 const ROOM_IDLE_MS = 30 * 60 * 1000;  // ไม่มีใครออนไลน์นานเท่านี้ ลบห้อง
+const BOT_MS = Number(process.env.JUAPHI_BOT_MS) || 900;      // บอตคิดนาน BOT_MS ถึง 2×BOT_MS ก่อนทำอะไร
+const BOT_NAMES = ['บอตปอบ', 'บอตกระสือ', 'บอตกระหัง', 'บอตตานี', 'บอตกุมาร', 'บอตเปรต', 'บอตโขมด'];
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -90,13 +93,15 @@ function createRoom() {
   return r;
 }
 
+/** มีคนจริง (ไม่ใช่บอต) ออนไลน์อยู่ในห้องไหม */
+const humanOnline = (r) => r.players.some((p) => p.online && !p.bot);
 const hostName = (r) => r.players.find((p) => p.id === r.hostId)?.name || '';
 const inGame = (r) => !!r.game && !r.game.winner;
 
 function listRooms() {
   const out = [];
   for (const r of rooms.values()) {
-    if (!r.players.some((p) => p.online)) continue;
+    if (!humanOnline(r)) continue;
     out.push({ code: r.code, name: `ห้องของ ${hostName(r)}`, players: r.players.length, max: MAX_SEATS, status: inGame(r) ? 'play' : 'lobby' });
   }
   out.sort((a, b) => (a.status === b.status ? 0 : a.status === 'lobby' ? -1 : 1) || a.code.localeCompare(b.code));
@@ -132,7 +137,7 @@ function stateFor(r, p) {
       code: r.code,
       name: `ห้องของ ${hostName(r)}`,
       hostId: r.hostId,
-      players: r.players.map((x) => ({ id: x.id, name: x.name, online: x.online, seat: x.seat })),
+      players: r.players.map((x) => ({ id: x.id, name: x.name, online: x.online, seat: x.seat, bot: !!x.bot })),
       names: r.names,
     },
     game: r.game ? viewFor(r.game, seatedInGame ? p.id : null) : null,
@@ -165,7 +170,8 @@ function deliver(r, events) {
 function ensureHost(r) {
   const host = r.players.find((p) => p.id === r.hostId);
   if (host && (host.online || Date.now() - host.offlineSince < GRACE_MS)) return;
-  const next = r.players.find((p) => p.online) || r.players[0];
+  // หัวห้องต้องเป็นคนจริงเสมอ
+  const next = r.players.find((p) => p.online && !p.bot) || r.players.find((p) => !p.bot);
   r.hostId = next ? next.id : null;
 }
 
@@ -186,7 +192,35 @@ function afterChange(r, events) {
     r.windowEndsAt = 0;
   }
   scheduleTakeover(r);
+  scheduleBots(r);
   broadcast(r);
+}
+
+/** ทำคำสั่งของผู้เล่นหรือบอต คืนข้อความผิดพลาด หรือ null ถ้าสำเร็จ */
+function runAct(r, p, action) {
+  const before = r.game.pending;
+  const res = G.act(r.game, p.id, action, r.rng);
+  if (!res.ok) return res.error;
+  // "ไม่!" หรือเล่นการ์ดใหม่ เริ่มนับเวลาใหม่
+  if (action.type === 'nope' || (action.type === 'play' && before !== r.game.pending)) r.windowEndsAt = 0;
+  afterChange(r, res.events);
+  return null;
+}
+
+/** ให้บอตที่มีเรื่องต้องทำ คิดสักครู่แล้วทำ หยุดทั้งหมดถ้าไม่มีคนจริงออนไลน์ */
+function scheduleBots(r) {
+  const g = r.game;
+  for (const p of r.players) {
+    if (!p.bot || p.botTimer) continue;
+    if (!g || g.winner || !humanOnline(r) || !g.players.some((x) => x.id === p.id)) continue;
+    if (!botMove(viewFor(g, p.id), p.id, Math.random, p.memo)) continue;
+    p.botTimer = setTimeout(() => {
+      p.botTimer = null;
+      if (r.game !== g || !r.players.includes(p) || !humanOnline(r)) return;
+      const move = botMove(viewFor(g, p.id), p.id, Math.random, p.memo);
+      if (!move || runAct(r, p, move)) scheduleBots(r);
+    }, BOT_MS + Math.random() * BOT_MS);
+  }
 }
 
 /** ถ้าคนที่เกมรออยู่หลุด รอ GRACE_MS (นับจากตอนที่เริ่มรอเขา) แล้วทำแทน
@@ -196,7 +230,7 @@ function scheduleTakeover(r) {
   const id = g ? G.waitingOn(g) : null;
   const p = id && r.players.find((x) => x.id === id);
   const offline = !p || !p.online;
-  const anyoneHere = g && g.players.some((gp) => r.players.some((x) => x.id === gp.id && x.online));
+  const anyoneHere = g && g.players.some((gp) => r.players.some((x) => x.id === gp.id && x.online && !x.bot));
   if (!id || !offline || !anyoneHere) {
     clearTimeout(r.takeoverTimer);
     r.takeoverTimer = null;
@@ -226,7 +260,7 @@ function startGame(r) {
   // แจกเฉพาะคนที่ออนไลน์ คนที่หลุดอยู่ได้ดูก่อนแล้วเล่นเกมถัดไป
   const seated = r.players.filter((p) => p.online).slice(0, MAX_SEATS);
   for (const p of r.players) p.seat = seated.includes(p) ? 'player' : 'watch';
-  for (const p of seated) { clearTimeout(p.dropTimer); p.dropTimer = null; r.names[p.id] = p.name; }
+  for (const p of seated) { clearTimeout(p.dropTimer); p.dropTimer = null; r.names[p.id] = p.name; if (p.bot) p.memo = {}; }
   r.rng = SEED != null ? makeRng(SEED) : Math.random;
   r.game = G.createGame(seated.map((p) => p.id), r.rng);
   r.windowEndsAt = 0;
@@ -235,6 +269,7 @@ function startGame(r) {
 
 function removeFromRoom(r, p) {
   clearTimeout(p.dropTimer);
+  clearTimeout(p.botTimer);
   if (r.game) {
     const events = G.removePlayer(r.game, p.id, r.rng);
     r.players = r.players.filter((x) => x !== p);
@@ -246,10 +281,12 @@ function removeFromRoom(r, p) {
     ensureHost(r);
     broadcast(r);
   }
-  if (!r.players.length) deleteRoom(r);
+  // เหลือแต่บอต ปิดห้อง
+  if (!r.players.some((x) => !x.bot)) deleteRoom(r);
 }
 
 function deleteRoom(r) {
+  for (const p of r.players) clearTimeout(p.botTimer);
   clearTimeout(r.windowTimer);
   clearTimeout(r.takeoverTimer);
   clearTimeout(r.idleTimer);
@@ -282,6 +319,7 @@ wss.on('connection', (ws) => {
     send(ws, { t: 'joined', room: r.code, secret: p.secret, id: p.id });
     ensureHost(r);
     scheduleTakeover(r);
+    scheduleBots(r);
     broadcast(r);
   }
 
@@ -334,12 +372,19 @@ wss.on('connection', (ws) => {
         // จั่วหรือ "ไม่!" ที่อ้างสถานะเก่า = กดซ้ำ ปัดทิ้งเงียบๆ
         const type = m.action && m.action.type;
         if ((type === 'draw' || type === 'nope') && typeof m.seq === 'number' && m.seq !== r.seq) return fail('', 'stale');
-        const before = r.game.pending;
-        const res = G.act(r.game, me.id, m.action, r.rng);
-        if (!res.ok) return fail(res.error);
-        // "ไม่!" หรือเล่นการ์ดใหม่ เริ่มนับเวลาใหม่
-        if (m.action.type === 'nope' || (m.action.type === 'play' && before !== r.game.pending)) r.windowEndsAt = 0;
-        return afterChange(r, res.events);
+        const err = runAct(r, me, m.action);
+        return err ? fail(err) : undefined;
+      }
+      case 'addBot': {
+        if (!isHost) return fail('หัวห้องเป็นคนเพิ่มบอต');
+        if (r.players.length >= MAX_SEATS) return fail(`ห้องเต็มแล้ว (${MAX_SEATS} คน)`);
+        const used = new Set(r.players.map((p) => p.name));
+        const name = BOT_NAMES.find((n) => !used.has(n)) || `บอต${r.players.length + 1}`;
+        r.players.push({
+          id: newId(), secret: null, name, bot: true, ws: null, online: true, offlineSince: 0,
+          dropTimer: null, botTimer: null, memo: {}, seat: inGame(r) ? 'watch' : 'player',
+        });
+        return broadcast(r);
       }
       case 'kick': {
         if (!isHost) return;
@@ -368,7 +413,7 @@ wss.on('connection', (ws) => {
     p.ws = null;
     if (!inGame(r) || !r.game.players.some((x) => x.id === p.id)) armDrop(r, p);
     setTimeout(() => { ensureHost(r); broadcast(r); }, GRACE_MS + 10);
-    if (!r.players.some((x) => x.online)) {
+    if (!humanOnline(r)) {
       r.idleTimer = setTimeout(() => { if (!r.players.some((x) => x.online)) deleteRoom(r); }, ROOM_IDLE_MS);
     }
     scheduleTakeover(r);

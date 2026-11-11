@@ -17,3 +17,10 @@ test('summarizeRooms lists every room with counts only, no names', () => {
   ]);
   assert.ok(!JSON.stringify(out).includes('ต้น'));
 });
+
+test('bots count as seats but not as people online', () => {
+  const rooms = new Map([
+    ['BOTS', { code: 'BOTS', game: null, lastActive: 0, players: [{ online: true }, { online: true, bot: true }, { online: true, bot: true }] }],
+  ]);
+  assert.deepEqual(summarizeRooms(rooms, 0), [{ code: 'BOTS', state: 'waiting', players: 3, online: 1, idleMin: 0, note: '2 bots' }]);
+});

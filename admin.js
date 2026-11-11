@@ -11,13 +11,18 @@ const path = require('node:path');
  * { code, state: 'waiting' | 'playing', players, online, idleMin }
  */
 function summarizeRooms(rooms, now = Date.now()) {
-  return [...rooms.values()].map((r) => ({
-    code: r.code,
-    state: r.game && !r.game.winner ? 'playing' : 'waiting',
-    players: r.players.length,
-    online: r.players.filter((p) => p.online).length,
-    idleMin: Math.floor((now - (r.lastActive || now)) / 60000),
-  }));
+  return [...rooms.values()].map((r) => {
+    const bots = r.players.filter((p) => p.bot).length;
+    const out = {
+      code: r.code,
+      state: r.game && !r.game.winner ? 'playing' : 'waiting',
+      players: r.players.length,
+      online: r.players.filter((p) => p.online && !p.bot).length,   // บอตไม่นับว่าเป็นคนเล่นอยู่
+      idleMin: Math.floor((now - (r.lastActive || now)) / 60000),
+    };
+    if (bots) out.note = `${bots} bot${bots > 1 ? 's' : ''}`;
+    return out;
+  });
 }
 
 function startAdminSocket(list) {
