@@ -268,6 +268,12 @@ test('/api/art lists the card images that exist, and three.js is served', async 
   assert.ok(art.includes('zz-test2.webp'));
   const webp = await fetch(`http://127.0.0.1:${srv.port}/cards/zz-test2.webp`);
   assert.equal(webp.headers.get('content-type'), 'image/webp');
+  assert.match(webp.headers.get('cache-control') || '', /max-age=\d+/);
+  // โค้ดหน้าเว็บต้องถามเซิร์ฟเวอร์ใหม่ทุกครั้ง ไม่อย่างนั้นหลัง deploy เบราว์เซอร์ยังใช้ JS เก่า
+  for (const f of ['/', '/ui.js', '/style.css']) {
+    const r = await fetch(`http://127.0.0.1:${srv.port}${f}`);
+    assert.equal(r.headers.get('cache-control'), 'no-cache', f);
+  }
   const three = await fetch(`http://127.0.0.1:${srv.port}/vendor/three.module.js`);
   assert.equal(three.status, 200);
   const evil = await fetch(`http://127.0.0.1:${srv.port}/..%2fpackage.json`);

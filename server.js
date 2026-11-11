@@ -43,7 +43,10 @@ function serveFile(res, file) {
   try {
     fs.readFile(file, (err, data) => {
       if (err) return notFound();
-      res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+      const ext = path.extname(file);
+      // หน้าเว็บกับโค้ด: ให้เบราว์เซอร์ถามใหม่ทุกครั้ง (deploy แล้วได้ของใหม่ทันที) ส่วนภาพกับ three.js เก็บไว้ได้
+      const cache = ['.html', '.js', '.css'].includes(ext) && !file.startsWith(VENDOR) ? 'no-cache' : 'public, max-age=86400';
+      res.writeHead(200, { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': cache });
       res.end(data);
     });
   } catch {
