@@ -6,7 +6,7 @@ import * as sound from './sound.js';
 import { revealGhost } from './reveal.js';
 
 const $ = (id) => document.getElementById(id);
-const NOPE_MS = 3000;
+const NOPE_MS = 2500;
 const MAX_SEATS = 8;   // ต้องตรงกับ server.js
 const RING_LEN = 2 * Math.PI * 46;   // เส้นรอบวงของวงแหวนนับเวลารอบปุ่ม ไม่! (r = 46 ใน index.html)
 let scene = null;
