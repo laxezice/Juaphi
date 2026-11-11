@@ -53,10 +53,14 @@ function botMove(v, you, rng, memo) {
   if (others.length) {
     for (const c of me.hand.filter((x) => x.kind === 'beg')) options.push({ type: 'play', uids: [c.uid], target: pick(others, rng).id });
 
+    // ผีน้อยคู่ ถ้ามีตัวเดียวใช้แปลงร่างแทนอีกตัว (เก็บแปลงร่างไว้ใช้ตอนจำเป็น)
+    const wild = me.hand.filter((c) => c.kind === 'wild');
     for (const k of IMPS) {
       const same = me.hand.filter((c) => c.kind === k);
       if (same.length >= 2) options.push({ type: 'play', uids: [same[0].uid, same[1].uid], target: pick(others, rng).id });
+      else if (same.length === 1 && wild.length) options.push({ type: 'play', uids: [same[0].uid, wild[0].uid], target: pick(others, rng).id });
     }
+    if (wild.length >= 2) options.push({ type: 'play', uids: [wild[0].uid, wild[1].uid], target: pick(others, rng).id });
   }
   // ผีเข้า: เลือกใครก็ได้ที่ยังรอด มือว่างก็ได้
   const living = v.players.filter((p) => p.id !== you && p.alive);

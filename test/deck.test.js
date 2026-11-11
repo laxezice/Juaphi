@@ -25,8 +25,9 @@ test('7 players use the doubled table', () => {
   const r = buildDeck(7, makeRng(2));
   assert.equal(count(r.deck, 'ghost'), 6);
   assert.equal(count(r.deck, 'talisman'), 3);
-  assert.equal(count(all(r), 'nope'), 12);
-  assert.equal(count(all(r), 'imp3'), 10);
+  assert.equal(count(all(r), 'nope'), 14);
+  assert.equal(count(all(r), 'imp3'), 8);
+  assert.equal(count(all(r), 'wild'), 6);
 });
 
 test('2 players get one ghost', () => {

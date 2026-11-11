@@ -54,10 +54,15 @@ async function waitFor(fn, ms = 4000) {
   throw new Error('timed out');
 }
 
-async function setupRoom(srv, names) {
+/** extras: ห้องใหม่เปิดการ์ดเสริมเป็นค่าเริ่มต้น เทสต์ส่วนใหญ่ปิดไว้ ใช้กองชุดหลักที่ seed กำหนดผลไว้ */
+async function setupRoom(srv, names, { extras = false } = {}) {
   const [host, ...rest] = await Promise.all(names.map((n) => srv.client(n)));
   host.send({ t: 'create', name: host.name, secret: host.secret });
   await waitFor(() => host.room);
+  if (!extras) {
+    host.send({ t: 'options', extras: false });
+    await waitFor(() => host.state && host.state.room.extras === false);
+  }
   for (const c of rest) {
     c.send({ t: 'join', room: host.room, name: c.name, secret: c.secret });
     await waitFor(() => c.room);
@@ -98,16 +103,19 @@ test('only the host can add a bot; bots are marked and can be kicked', async (t)
   await waitFor(() => a.state.room.players.length === 3);
 });
 
-test('the host turns on extra cards; it shows in the room list and the next game', async (t) => {
+test('extra cards are on in a new room; only the host can switch them, and not mid-game', async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
-  const [a, b] = await setupRoom(srv, ['A', 'B']);
-  b.send({ t: 'options', extras: true });
+  const [a, b] = await setupRoom(srv, ['A', 'B'], { extras: true });
+  assert.equal(a.state.room.extras, true);
+  b.send({ t: 'options', extras: false });
   await waitFor(() => b.errors.length === 1);
-  assert.equal(a.state.room.extras, false);
+  assert.equal(a.state.room.extras, true);
   const watcher = await srv.client('W');
-  a.send({ t: 'options', extras: true });
-  await waitFor(() => a.state.room.extras === true && b.state.room.extras === true);
   await waitFor(() => watcher.rooms && watcher.rooms.some((r) => r.code === a.room && r.extras));
+  a.send({ t: 'options', extras: false });
+  await waitFor(() => a.state.room.extras === false && b.state.room.extras === false);
+  a.send({ t: 'options', extras: true });
+  await waitFor(() => a.state.room.extras === true);
   a.send({ t: 'start' });
   await waitFor(() => a.state.game);
   assert.equal(a.state.game.extras, true);

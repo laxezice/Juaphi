@@ -119,3 +119,8 @@ Painterly digital illustration for a party card game, Thai haunted house folklor
 ```
 Painterly digital illustration for a party card game, Thai haunted house folklore theme, playful spooky (cute, not scary, no gore). Subject: a sneaky hand slipping the very bottom card out from under a tall stack of cards, while a small ghost lies in wait curled on top of the stack, unaware. Main color accent: mischievous purple. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
 ```
+
+### `wild` ผีน้อย · แปลงร่าง (ใช้แทนผีน้อยแบบไหนก็ได้) → `public/cards/wild.png`
+```
+Painterly digital illustration for a party card game, Thai haunted house folklore theme, cute and playful spooky (chibi proportions, not scary). Subject: a small round mischievous shapeshifter ghost caught mid-transformation inside a swirl of colorful smoke, its body morphing between five little Thai spirits at once: a golden topknot on its head, a trail of icy blue-white glow below, one arm turning into a woven bamboo winnowing-basket wing, one glowing red eye, and a banana leaf wrapped around it like a cape, grinning proudly. Main color accent: rainbow-tinted smoke swirling gold, blue, red and green. Dark indigo background, soft rim lighting, gouache texture, centered single subject readable at small size on a phone, plain dark vignette in the bottom quarter, portrait 5:7, 750x1050, absolutely no text, no letters, no numbers, no watermark, no border, no frame.
+```

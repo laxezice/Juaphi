@@ -253,3 +253,28 @@ test('createGame starts with the chosen player, and remembers who is out first',
   act(h, 'B', { type: 'draw' }, R);
   assert.equal(h.firstOut, 'A');
 });
+
+// ---------- ผีน้อยแปลงร่าง ----------
+test('a wild imp pairs or makes a triple with any imp, but not with two different imps', () => {
+  const g = rig({ A: ['imp1', 'wild', 'imp2', 'wild', 'imp3', 'imp3'], B: ['mirror', 'wind'] }, ['sneak']);
+  const pair = act(g, 'A', { type: 'play', uids: [uidOf(g, 'A', 'imp1'), uidOf(g, 'A', 'wild')], target: 'B' }, R);
+  assert.equal(pair.ok, true, pair.error);
+  const r = resolvePending(g, R);
+  assert.equal(r.events.at(-1).type, 'steal');
+  const h = rig({ A: ['imp1', 'imp2', 'wild'], B: ['mirror'] }, ['sneak']);
+  const bad = act(h, 'A', { type: 'play', uids: player(h, 'A').hand.map((c) => c.uid), target: 'B', name: 'mirror' }, R);
+  assert.equal(bad.ok, false);
+  const k = rig({ A: ['imp3', 'imp3', 'wild'], B: ['mirror'] }, ['sneak']);
+  const triple = act(k, 'A', { type: 'play', uids: player(k, 'A').hand.map((c) => c.uid), target: 'B', name: 'mirror' }, R);
+  assert.equal(triple.ok, true, triple.error);
+  const w = rig({ A: ['wild', 'wild'], B: ['mirror'] }, ['sneak']);
+  assert.equal(act(w, 'A', { type: 'play', uids: player(w, 'A').hand.map((c) => c.uid), target: 'B' }, R).ok, true);
+  const one = rig({ A: ['wild'], B: ['mirror'] }, ['sneak']);
+  assert.equal(act(one, 'A', { type: 'play', uids: [uidOf(one, 'A', 'wild')], target: 'B' }, R).ok, false);
+});
+
+test('a bot pairs a lone imp with a wild imp', () => {
+  const g = rig({ A: ['imp4', 'wild'], B: ['mirror'] }, ['sneak']);
+  const m = botMove(viewFor(g, 'A'), 'A', always, {});
+  assert.deepEqual(m, { type: 'play', uids: [uidOf(g, 'A', 'imp4'), uidOf(g, 'A', 'wild')], target: 'B' });
+});

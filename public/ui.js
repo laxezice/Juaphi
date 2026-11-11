@@ -1,6 +1,6 @@
 // หน้าจอทั้งหมดที่เป็น HTML: หน้าแรก ห้องรอ ปุ่มในเกม กล่องเลือก และบันทึกเหตุการณ์
 import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, forgetRoom } from './net.js';
-import { CARD_INFO, KIND_ORDER, EXTRA_KINDS, kindsFor, describeSelection, deckCount } from './cards.js';
+import { CARD_INFO, KIND_ORDER, kindsFor, describeSelection, deckCount, impSet } from './cards.js';
 import { openTray, openOrderTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
 import * as sound from './sound.js';
 import { revealGhost } from './reveal.js';
@@ -175,17 +175,18 @@ function toggleCard(uid) {
   if (!g || !g.me || !g.me.alive) return;
   if (selected.has(uid)) selected.delete(uid);
   else {
-    // เลือกการ์ดคนละแบบ = เริ่มเลือกใหม่ ยกเว้นผีน้อยแบบเดียวกัน
+    // เลือกการ์ดคนละแบบ = เริ่มเลือกใหม่ ยกเว้นผีน้อยแบบเดียวกัน (แปลงร่างเข้าชุดกับผีน้อยแบบไหนก็ได้)
     const card = handCards().find((c) => c.uid === uid);
-    const first = handCards().find((c) => selected.has(c.uid));
-    if (first && (first.kind !== card.kind || !CARD_INFO[card.kind].imp || selected.size >= 3)) selected.clear();
+    const sel = handCards().filter((c) => selected.has(c.uid));
+    if (sel.length && (sel.length >= 3 || !impSet([...sel, card]))) selected.clear();
     selected.add(uid);
   }
   render();
 }
 
 async function playSelected() {
-  const cards = handCards().filter((c) => selected.has(c.uid));
+  // แปลงร่างไว้ท้ายชุด บันทึกเหตุการณ์จะได้เรียกชื่อตามผีน้อยตัวจริง
+  const cards = handCards().filter((c) => selected.has(c.uid)).sort((a, b) => (a.kind === 'wild') - (b.kind === 'wild'));
   const sel = describeSelection(cards);
   if (!sel.ok) return toast(sel.label);
   const action = { type: 'play', uids: cards.map((c) => c.uid) };
@@ -640,14 +641,20 @@ function openCombos() {
   const hand = handCards();
   openPanel('คอมโบ', (body) => {
     // คอมโบที่ทำได้ตอนนี้จากการ์ดในมือ
-    const ready = KIND_ORDER.filter((k) => CARD_INFO[k].imp && hand.filter((c) => c.kind === k).length >= 2);
+    // นับแปลงร่างเป็นผีน้อยตัวไหนก็ได้
+    const wilds = hand.filter((c) => c.kind === 'wild').length;
+    const ready = KIND_ORDER.filter((k) => CARD_INFO[k].imp && !CARD_INFO[k].wild && hand.some((c) => c.kind === k)
+      && hand.filter((c) => c.kind === k).length + wilds >= 2);
+    if (wilds >= 2 && !ready.length) ready.push('wild');
     if (ready.length) {
       const h = document.createElement('h3');
       h.textContent = 'ในมือคุณตอนนี้';
       body.append(h);
       for (const k of ready) {
-        const n = hand.filter((c) => c.kind === k).length;
-        body.append(comboRow(Array(Math.min(3, n)).fill(k), `${cardName(k)} ×${n}`,
+        const own = k === 'wild' ? 0 : hand.filter((c) => c.kind === k).length;
+        const n = own + wilds;
+        const pics = [...Array(Math.min(3, own)).fill(k), ...Array(Math.max(0, Math.min(3, n) - own)).fill('wild')];
+        body.append(comboRow(pics, `${cardName(k)} ×${n}${wilds && k !== 'wild' ? ` (รวมแปลงร่าง ${wilds})` : ''}`,
           n >= 3 ? 'เล่นสามใบเพื่อทวงการ์ดที่ระบุ หรือเล่นแค่คู่เพื่อขโมยแบบสุ่ม' : 'เล่นคู่นี้เพื่อขโมยการ์ดเพื่อนแบบสุ่ม 1 ใบ'));
       }
     }
@@ -657,6 +664,7 @@ function openCombos() {
     body.append(
       comboRow(['imp4', 'imp4'], 'ผีน้อยคู่ (แบบเดียวกัน)', 'เลือกเพื่อน 1 คน แล้วสุ่มขโมยการ์ดในมือเขา 1 ใบ'),
       comboRow(['imp2', 'imp2', 'imp2'], 'ผีน้อยสามใบ (แบบเดียวกัน)', 'เลือกเพื่อนแล้วระบุชื่อการ์ด ถ้าเขามีต้องยกให้คุณ ถ้าไม่มีก็ไม่ได้อะไร'),
+      comboRow(['imp1', 'wild'], 'แปลงร่างเข้าชุด', 'ผีน้อยแปลงร่างใช้แทนผีน้อยแบบไหนก็ได้ จับคู่หรือรวมสามใบกับผีน้อยตัวไหนก็ได้'),
       comboRow(['nope', 'nope'], 'ไม่! ซ้อน ไม่!', '"ไม่!" ใบที่สองยกเลิกใบแรก การ์ดที่ถูกยกเลิกจะกลับมามีผล นับเลขคี่ = ยกเลิก'),
       comboRow(['curse', 'curse2'], 'สาปส่งต่อ', 'โดนสาปแล้วสาปต่อ ตาที่ค้างทั้งหมดทบไปให้คนถัดไป บวกอีก 2 หรือ 3 ตา'),
       comboRow(['mirror', 'sneak'], 'เคล็ดลับ: ส่องกระจกแล้วหนี', 'ส่องเห็นผีอยู่บนสุด ใช้ย่องหนีหรือสาปส่งจบตาโดยไม่ต้องจั่ว'),

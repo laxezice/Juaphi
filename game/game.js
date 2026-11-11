@@ -121,7 +121,11 @@ function doInsert(g, me, index) {
 const EXTRAS = new Set(['blackout', 'possess', 'grave', 'fate', 'reverse', 'bottom']);
 const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', ...EXTRAS]);
 const IMPS = new Set(['imp1', 'imp2', 'imp3', 'imp4', 'imp5']);
-const ALL_KINDS = new Set(['ghost', 'talisman', 'nope', ...SINGLE, ...IMPS]);
+const WILD = 'wild';   // ผีน้อยแปลงร่าง ใช้แทนผีน้อยแบบไหนก็ได้
+const ALL_KINDS = new Set(['ghost', 'talisman', 'nope', ...SINGLE, ...IMPS, WILD]);
+const isImp = (k) => IMPS.has(k) || k === WILD;
+/** ชุดผีน้อยที่ใช้ได้: ผีน้อยทั้งหมด และแบบที่ไม่ใช่ตัวแทนต้องเหมือนกัน (ตัวแทนล้วนก็ได้) */
+const impSet = (cards) => cards.every((c) => isImp(c.kind)) && new Set(cards.map((c) => c.kind).filter((k) => k !== WILD)).size <= 1;
 /** การ์ดในกองทิ้งที่ "ขุดหลุมศพ" หยิบได้: ไม่ใช่ผี และไม่ใช่ขุดหลุมศพด้วยกัน (กันวนไม่จบ) */
 const diggable = (g) => g.discard.filter((c) => c.kind !== 'ghost' && c.kind !== 'grave');
 const randomIndex = (n, rng) => Math.floor(rng() * n);
@@ -143,11 +147,11 @@ function checkPlay(g, me, cards, target, name) {
     return null;
   }
   if (cards.length === 1 && SINGLE.has(k)) return k === 'beg' ? needTarget() : null;
-  if (IMPS.has(k) && (cards.length === 2 || cards.length === 3) && cards.every((c) => c.kind === k)) {
+  if ((cards.length === 2 || cards.length === 3) && impSet(cards)) {
     if (cards.length === 3 && !ALL_KINDS.has(name)) return 'ระบุชื่อการ์ดที่ต้องการ';
     return needTarget();
   }
-  if (cards.length === 1 && IMPS.has(k)) return 'ผีน้อยต้องเล่นเป็นคู่หรือสามใบแบบเดียวกัน';
+  if (cards.length === 1 && isImp(k)) return 'ผีน้อยต้องเล่นเป็นคู่หรือสามใบแบบเดียวกัน (แปลงร่างใช้แทนได้)';
   if (cards.length === 1) return 'การ์ดใบนี้เล่นเองไม่ได้';
   return 'เล่นการ์ดชุดนี้ด้วยกันไม่ได้';
 }

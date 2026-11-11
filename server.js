@@ -107,7 +107,7 @@ function newCode() {
 
 function createRoom() {
   const r = {
-    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: false,
+    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: true,   // ห้องใหม่เปิดการ์ดเสริมไว้ก่อน
     windowTimer: null, windowEndsAt: 0, takeoverTimer: null, takeoverFor: null, idleTimer: null,
   };
   rooms.set(r.code, r);

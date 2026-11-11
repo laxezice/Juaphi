@@ -21,6 +21,7 @@ export const CARD_INFO = {
   imp3: { name: 'กระหัง', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#8a7a4a' },
   imp4: { name: 'ปอบ', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#8f2f3a' },
   imp5: { name: 'ตานี', imp: true, text: 'ผีน้อย · คู่ = ขโมย · สามใบ = ทวง', color: '#3f7a3f' },
+  wild: { name: 'แปลงร่าง', imp: true, wild: true, text: 'ใช้แทนผีน้อยแบบไหนก็ได้ในคู่หรือสามใบ', color: '#7a5aa8' },
 };
 
 export const KIND_ORDER = Object.keys(CARD_INFO);
@@ -30,8 +31,8 @@ export const kindsFor = (extras) => KIND_ORDER.filter((k) => extras || !CARD_INF
 
 // จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
 const DECK = {
-  nope: [6, 12], sneak: [5, 10], curse: [4, 8], curse2: [1, 2], mirror: [6, 12], wind: [5, 10], beg: [4, 8],
-  imp1: [5, 10], imp2: [5, 10], imp3: [5, 10], imp4: [5, 10], imp5: [5, 10],
+  nope: [7, 14], sneak: [5, 10], curse: [4, 8], curse2: [1, 2], mirror: [6, 12], wind: [5, 10], beg: [5, 10],
+  imp1: [4, 8], imp2: [4, 8], imp3: [4, 8], imp4: [4, 8], imp5: [4, 8], wild: [3, 6],
   // การ์ดเสริม ต้องตรงกับ EXTRA_TABLE
   blackout: [2, 4], possess: [2, 4], grave: [2, 4], fate: [2, 4], reverse: [2, 4], bottom: [2, 4],
 };
@@ -48,7 +49,7 @@ export function deckCount(kind, n) {
 // ---------- วาดหน้าการ์ดลง canvas (ใช้เป็น texture ในฉาก 3 มิติ) ----------
 const GLYPH = {
   ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜',
-  blackout: 'ดับ', possess: 'เข้า', grave: 'ขุด', fate: 'ดวง', reverse: '↺', bottom: '↓',
+  wild: '?', blackout: 'ดับ', possess: 'เข้า', grave: 'ขุด', fate: 'ดวง', reverse: '↺', bottom: '↓',
 };
 export const CARD_W = 500;
 export const CARD_H = 700; // 5:7
@@ -351,14 +352,19 @@ const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', 'bl
  * ดูว่าการ์ดที่เลือกเล่นได้ไหม
  * @returns {{ ok: boolean, label: string, needTarget?: boolean, needName?: boolean }}
  */
+/** ชุดผีน้อยที่เล่นด้วยกันได้: แบบเดียวกันทั้งหมด โดยมีแปลงร่างแทนตัวไหนก็ได้ */
+export function impSet(cards) {
+  return cards.every((c) => CARD_INFO[c.kind]?.imp) && new Set(cards.map((c) => c.kind).filter((k) => k !== 'wild')).size <= 1;
+}
+
 export function describeSelection(cards) {
   if (!cards.length) return { ok: false, label: 'เลือกการ์ดที่จะเล่น' };
   const k = cards[0].kind;
-  const same = cards.every((c) => c.kind === k);
+  const same = impSet(cards);
   if (cards.length === 1 && SINGLE.has(k)) return { ok: true, label: `เล่น ${CARD_INFO[k].name}`, needTarget: k === 'beg' || k === 'possess' };
   if (same && CARD_INFO[k].imp && cards.length === 2) return { ok: true, label: 'ขโมยการ์ด (คู่ผีน้อย)', needTarget: true };
   if (same && CARD_INFO[k].imp && cards.length === 3) return { ok: true, label: 'ทวงการ์ด (ผีน้อยสามใบ)', needTarget: true, needName: true };
-  if (cards.length === 1 && CARD_INFO[k].imp) return { ok: false, label: 'ผีน้อยต้องเลือกคู่หรือสามใบแบบเดียวกัน' };
+  if (cards.length === 1 && CARD_INFO[k].imp) return { ok: false, label: 'ผีน้อยต้องเลือกคู่หรือสามใบแบบเดียวกัน (แปลงร่างใช้แทนได้)' };
   if (cards.length === 1 && k === 'nope') return { ok: false, label: '"ไม่!" ใช้ตอนคนอื่นเล่นการ์ด' };
   if (cards.length === 1) return { ok: false, label: 'การ์ดใบนี้เล่นเองไม่ได้' };
   return { ok: false, label: 'การ์ดชุดนี้เล่นด้วยกันไม่ได้' };
