@@ -1,0 +1,251 @@
+// Task 5: เซิร์ฟเวอร์ ห้อง รายการห้อง ตัวจับเวลา และข้อมูลลับ
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
+const { randomInt } = require('node:crypto');
+const path = require('node:path');
+const { WebSocket } = require('ws');
+const { createGame } = require('../game/game');
+const { makeRng } = require('../game/deck');
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function startServer(t, env = {}) {
+  const port = randomInt(33000, 49000);
+  const server = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  const clients = [];
+  t.after(() => { clients.forEach((c) => c.ws.terminate()); server.kill(); });
+  await new Promise((resolve, reject) => {
+    server.stdout.once('data', resolve);
+    server.once('error', reject);
+    server.once('exit', (code) => reject(new Error(`Server exited: ${code}`)));
+  });
+  async function client(name) {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const c = { name, ws, msgs: [], state: null, rooms: null, id: null, room: null, secret: 'sec-' + name, errors: [] };
+    c.send = (m) => ws.send(JSON.stringify(m));
+    ws.on('message', (data) => {
+      const m = JSON.parse(data);
+      c.msgs.push({ raw: String(data), m });
+      if (m.t === 'state') c.state = m;
+      if (m.t === 'rooms') c.rooms = m.rooms;
+      if (m.t === 'joined') { c.id = m.id; c.room = m.room; }
+      if (m.t === 'error') c.errors.push(m.msg);
+    });
+    await new Promise((r) => ws.once('open', r));
+    c.send({ t: 'hello' });
+    clients.push(c);
+    return c;
+  }
+  return { port, client };
+}
+
+async function waitFor(fn, ms = 4000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (fn()) return;
+    await sleep(15);
+  }
+  throw new Error('timed out');
+}
+
+async function setupRoom(srv, names) {
+  const [host, ...rest] = await Promise.all(names.map((n) => srv.client(n)));
+  host.send({ t: 'create', name: host.name, secret: host.secret });
+  await waitFor(() => host.room);
+  for (const c of rest) {
+    c.send({ t: 'join', room: host.room, name: c.name, secret: c.secret });
+    await waitFor(() => c.room);
+  }
+  await waitFor(() => host.state && host.state.room.players.length === names.length);
+  return [host, ...rest];
+}
+
+test('room list shows open rooms live, and a started game deals private hands', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '50' });
+  const a = await srv.client('A');
+  const b = await srv.client('B');
+  await waitFor(() => b.rooms);
+  assert.deepEqual(b.rooms, []);
+  a.send({ t: 'create', name: 'A', secret: a.secret });
+  await waitFor(() => b.rooms && b.rooms.length === 1);
+  assert.equal(b.rooms[0].code, a.room);
+  assert.equal(b.rooms[0].name, 'ห้องของ A');
+  assert.equal(b.rooms[0].players, 1);
+  assert.equal(b.rooms[0].max, 8);
+  assert.equal(b.rooms[0].status, 'lobby');
+
+  b.send({ t: 'join', room: a.room, name: 'B', secret: b.secret });
+  await waitFor(() => a.state && a.state.room.players.length === 2);
+  b.send({ t: 'start' });
+  await sleep(100);
+  assert.equal(a.state.game, null, 'only the host may start');
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && b.state.game);
+  assert.equal(a.state.game.me.hand.length, 8);
+  assert.equal(b.state.game.me.hand.length, 8);
+  const aUids = a.state.game.me.hand.map((c) => c.uid);
+  for (const u of aUids) assert.ok(!b.msgs.some((x) => x.raw.includes(`"${u}"`)), 'A hand leaked to B');
+  await waitFor(() => b.rooms[0].status === 'play');
+});
+
+test('a scripted 3-player game never leaks secrets to the wrong player', { timeout: 30000 }, async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: '7' });
+  const ps = await setupRoom(srv, ['A', 'B', 'C']);
+  ps[0].send({ t: 'start' });
+  await waitFor(() => ps.every((p) => p.state.game));
+
+  const used = new Set();
+  const step = (p) => {
+    const g = p.state.game;
+    if (!g || g.winner) return;
+    const hand = g.me.hand;
+    const pd = g.pending;
+    if (pd && pd.kind === 'window') return;
+    if (pd && pd.kind === 'insert') { if (pd.player === p.id) p.send({ t: 'act', action: { type: 'insert', index: 0 } }); return; }
+    if (pd && pd.kind === 'give') { if (pd.from === p.id) p.send({ t: 'act', action: { type: 'give', uid: hand[0].uid } }); return; }
+    if (!g.me.alive) {
+      if (g.me.grudge) {
+        const t2 = g.players.find((x) => x.alive && x.handCount > 0);
+        if (t2) p.send({ t: 'act', action: { type: 'grudge', target: t2.id } });
+      }
+      return;
+    }
+    if (g.current !== p.id) return;
+    const other = g.players.find((x) => x.id !== p.id && x.alive && x.handCount > 0);
+    const pick = (k) => hand.find((c) => c.kind === k && !used.has(c.uid));
+    const mirror = pick('mirror');
+    const beg = pick('beg');
+    const pair = ['imp1', 'imp2', 'imp3', 'imp4', 'imp5'].map((k) => hand.filter((c) => c.kind === k)).find((h) => h.length >= 2);
+    let action = { type: 'draw' };
+    if (mirror) action = { type: 'play', uids: [mirror.uid] };
+    else if (beg && other) action = { type: 'play', uids: [beg.uid], target: other.id };
+    else if (pair && other) action = { type: 'play', uids: [pair[0].uid, pair[1].uid], target: other.id };
+    if (action.uids) action.uids.forEach((u) => used.add(u));
+    p.send({ t: 'act', action });
+  };
+  const end = Date.now() + 20000;
+  while (Date.now() < end && !ps[0].state.game.winner) {
+    ps.forEach(step);
+    await sleep(40);
+  }
+  assert.ok(ps[0].state.game.winner, 'game should finish');
+
+  // การ์ดที่ทุกคนรู้ได้: เคยขึ้นกองทิ้ง หรือถูกเปิดในอีเวนต์สาธารณะ
+  const pub = new Set();
+  for (const p of ps) for (const { m } of p.msgs) {
+    if (m.t === 'state' && m.game && m.game.discardTop) pub.add(m.game.discardTop.uid);
+    if (m.t === 'event' && m.e.type === 'grudge') pub.add(m.e.card.uid);
+  }
+  let sawMirror = false;
+  for (const p of ps) {
+    const own = new Set();
+    for (const { raw, m } of p.msgs) {
+      if (m.t === 'state' && m.game && m.game.me) m.game.me.hand.forEach((c) => own.add(c.uid));
+      if (m.t === 'event') {
+        assert.equal(m.e.secret, undefined, 'raw secret object must never be sent');
+        if (m.e.type === 'insert') assert.equal(m.e.index, undefined);
+        if (m.e.type === 'mirror' && m.e.player === p.id) { sawMirror = true; m.e.cards.forEach((c) => own.add(c.uid)); }
+        if (m.e.type === 'mirror' && m.e.player !== p.id) assert.equal(m.e.cards, undefined);
+        if (m.e.card && (m.e.type === 'draw' || m.e.type === 'give' || m.e.type === 'steal')) own.add(m.e.card.uid);
+      }
+      assert.ok(!/"deck"\s*:/.test(raw), 'deck array sent');
+      for (const u of raw.match(/"c\d+"/g) || []) {
+        const uid = u.slice(1, -1);
+        assert.ok(own.has(uid) || pub.has(uid), `${p.name} saw a card it should not know: ${uid} in ${raw.slice(0, 200)}`);
+      }
+    }
+  }
+  assert.ok(sawMirror, 'the script should have played a mirror (seed 7)');
+});
+
+test('No! during the window cancels the play', async (t) => {
+  // หา seed ที่คนแรกมีย่องหนี และคนที่สองมี "ไม่!"
+  let seed = 1;
+  for (; seed < 500; seed++) {
+    const g = createGame(['x', 'y'], makeRng(seed));
+    if (g.players[0].hand.some((c) => c.kind === 'sneak') && g.players[1].hand.some((c) => c.kind === 'nope')) break;
+  }
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '600', JUAPHI_SEED: String(seed) });
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && b.state.game);
+  const sneak = a.state.game.me.hand.find((c) => c.kind === 'sneak');
+  a.send({ t: 'act', action: { type: 'play', uids: [sneak.uid] } });
+  await waitFor(() => b.state.game.pending && b.state.game.pending.kind === 'window');
+  assert.ok(b.state.windowLeftMs > 0 && b.state.windowLeftMs <= 600);
+  const nope = b.state.game.me.hand.find((c) => c.kind === 'nope');
+  b.send({ t: 'act', action: { type: 'nope', uid: nope.uid } });
+  await waitFor(() => a.state.game.pending && a.state.game.pending.nopeCount === 1);
+  await waitFor(() => a.state.game.pending === null, 2000);
+  assert.equal(a.state.game.current, a.id, 'sneak was cancelled, still A');
+  assert.ok(a.msgs.some(({ m }) => m.t === 'event' && m.e.type === 'resolve' && m.e.cancelled === true));
+});
+
+test('the game plays for a disconnected current player after the grace time', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_GRACE_MS: '300' });
+  const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
+  a.send({ t: 'start' });
+  await waitFor(() => b.state.game);
+  assert.equal(b.state.game.current, a.id);
+  a.ws.close();
+  await waitFor(() => b.state.room.players.find((p) => p.id === a.id).online === false);
+  await waitFor(() => b.state.game.current !== a.id || b.state.game.pending, 3000);
+  assert.ok(b.state.game.deckCount < 40 || b.state.game.pending);
+  void c;
+});
+
+test('a player reconnecting with the same secret gets the same hand back', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30' });
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  a.send({ t: 'start' });
+  await waitFor(() => b.state.game);
+  const hand = b.state.game.me.hand.map((x) => x.uid).sort();
+  b.ws.close();
+  const b2 = await srv.client('B');
+  b2.secret = b.secret;
+  b2.send({ t: 'join', room: a.room, name: 'B', secret: b.secret });
+  await waitFor(() => b2.state && b2.state.game);
+  assert.deepEqual(b2.state.game.me.hand.map((x) => x.uid).sort(), hand);
+  assert.equal(b2.id, b.id);
+});
+
+test('someone joining a game in progress watches and sees no hand', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30' });
+  const [a] = await setupRoom(srv, ['A', 'B']);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  const d = await srv.client('D');
+  d.send({ t: 'join', room: a.room, name: 'D', secret: d.secret });
+  await waitFor(() => d.state && d.state.game);
+  assert.equal(d.state.room.players.find((p) => p.id === d.id).seat, 'watch');
+  assert.equal(d.state.game.me, undefined);
+  assert.equal(d.state.game.players.length, 2);
+});
+
+test('a room accepts at most 8 people including watchers', async (t) => {
+  const srv = await startServer(t);
+  const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const ps = await setupRoom(srv, names);
+  const x = await srv.client('X');
+  x.send({ t: 'join', room: ps[0].room, name: 'X', secret: x.secret });
+  await waitFor(() => x.errors.length);
+  assert.match(x.errors[0], /เต็ม/);
+});
+
+test('leaving mid-game removes the player and the game continues', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30' });
+  const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
+  a.send({ t: 'start' });
+  await waitFor(() => b.state.game);
+  a.send({ t: 'leave' });
+  await waitFor(() => b.state.game.players.find((p) => p.id === a.id).alive === false);
+  assert.equal(b.state.game.current, b.id);
+  assert.ok(!b.state.room.players.some((p) => p.id === a.id));
+  void c;
+});
