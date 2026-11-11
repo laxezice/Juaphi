@@ -35,6 +35,15 @@ test('a player sees their own hand and only counts for others', () => {
   for (const card of g.deck) assert.ok(!json.includes(`"${card.uid}"`), 'deck card leaked');
 });
 
+test('the view says whether the current player is cursed (to show the curse stack)', () => {
+  const g = createGame(['A', 'B', 'C'], makeRng(5));
+  assert.equal(viewFor(g, 'A').cursed, false);
+  g.cursed = true;
+  g.turnsLeft = 3;
+  assert.equal(viewFor(g, 'B').cursed, true);
+  assert.equal(viewFor(g, null).cursed, true);
+});
+
 test('a watcher view has no hand', () => {
   const g = createGame(['A', 'B'], makeRng(3));
   const v = viewFor(g, null);

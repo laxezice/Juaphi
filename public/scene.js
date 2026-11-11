@@ -404,34 +404,15 @@ export async function createScene(canvas, hooks) {
         return;
       }
       case 'ghost': {
-        const c = makeCard(null);
-        const start = top();
-        const mid = new THREE.Vector3(0, 2.4, 1.6);
-        c.position.copy(start);
-        scene.add(c);
-        await tween(500, (t) => {
-          const e2 = ease(t);
-          c.position.lerpVectors(start, mid, e2);
-          c.rotation.set(-Math.PI / 2 + e2 * 1.2, 0, 0);
-          c.scale.setScalar(1 + e2 * 1.4);
-          if (!reduced) candleDim = 1 - 0.75 * e2;
-        });
-        setFace(c, 'ghost');
-        c.rotation.y = 0;
-        if (!reduced) shake = 0.6;
-        await tween(350, (t) => { c.rotation.x = -Math.PI / 2 + 1.2 + (Math.PI / 2 - 1.2 + 0.25) * ease(t); });
-        await burst(e.saved ? goldTex : redTex, mid.clone().add(new THREE.Vector3(0, 0, 0.3)), e.saved ? 4.5 : 5, 800);
-        await sleep(350);
-        await tween(500, (t) => {
-          c.position.lerpVectors(mid, e.saved ? seatPos(e.player) : DISCARD.clone().setY(0.08), ease(t));
-          c.scale.setScalar(lerp(2.4, 1, ease(t)));
-          c.rotation.x = lerp(0.25, -Math.PI / 2, ease(t));
-          if (!reduced) candleDim = lerp(0.25, 1, t);
-        });
-        scene.remove(c);
+        // ฉากเปิดการ์ดผีใหญ่อยู่ใน HTML (reveal.js) ที่นี่แค่ให้ไฟวูบ แล้วการ์ดบินไปที่ของมัน
+        if (!reduced) {
+          await tween(400, (t) => { candleDim = 1 - 0.7 * ease(t); });
+          await sleep(900);
+          await tween(600, (t) => { candleDim = lerp(0.3, 1, t); });
+        }
         candleDim = 1;
-        if (e.saved) fly('talisman', seatPos(e.player), DISCARD.clone().setY(0.07), { ms: 500 });
-        return;
+        if (e.saved) return fly('talisman', seatPos(e.player), DISCARD.clone().setY(0.07), { ms: 500 });
+        return fly('ghost', top(), DISCARD.clone().setY(0.08), { ms: 600, height: 1 });
       }
       case 'insert':
         return fly(null, seatPos(e.player), top(), { ms: 700, height: 0.8 });

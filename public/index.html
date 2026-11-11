@@ -19,7 +19,8 @@
     "/cards.js": "/cards.js?v=__V__",
     "/scene.js": "/scene.js?v=__V__",
     "/tray.js": "/tray.js?v=__V__",
-    "/sound.js": "/sound.js?v=__V__"
+    "/sound.js": "/sound.js?v=__V__",
+    "/reveal.js": "/reveal.js?v=__V__"
   } }</script>
 </head>
 <body>
@@ -130,6 +131,22 @@
       <button id="panel-close" class="btn ghost small">ปิด</button>
     </header>
     <div id="panel-body"></div>
+  </div>
+
+  <!-- ฉากเปิดการ์ดผี (reveal.js) -->
+  <div id="reveal" class="reveal" hidden aria-live="assertive">
+    <div class="reveal-flash"></div>
+    <div id="reveal-card" class="reveal-card">
+      <div class="reveal-inner">
+        <img id="reveal-back" class="reveal-side reveal-back" alt="">
+        <img id="reveal-face" class="reveal-side reveal-face" alt="ผี">
+      </div>
+    </div>
+    <div id="reveal-talisman" class="reveal-talisman"><img alt="ยันต์"></div>
+    <div class="reveal-caption">
+      <div id="reveal-text" class="reveal-text"></div>
+      <div id="reveal-sub" class="reveal-sub"></div>
+    </div>
   </div>
 
   <div id="toast" class="toast" hidden></div>

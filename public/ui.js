@@ -3,6 +3,7 @@ import { net, on, connect, send, setName, createRoom, joinRoom, leaveRoom, act, 
 import { CARD_INFO, KIND_ORDER, describeSelection, deckCount } from './cards.js';
 import { openTray, closeTray, trayKey, onTrayChange, cardEl, openPanel, closePanel } from './tray.js';
 import * as sound from './sound.js';
+import { revealGhost } from './reveal.js';
 
 const $ = (id) => document.getElementById(id);
 const NOPE_MS = 3000;
@@ -313,10 +314,23 @@ function renderHand(g) {
 let chain = null;      // { actor, kinds, target, name, nopes: [playerId|null], result: null | 'cancelled' | 'done' }
 let chainTimer = null;
 
+/** สาปส่งจะทำให้ใครต้องเล่นกี่ตา: (ตาที่คนสาปเหลือ ถ้ากำลังโดนสาปอยู่) + 2 หรือ + 3 ตามกติกา */
+function curseStack(g, actor, kind) {
+  if (!g || (kind !== 'curse' && kind !== 'curse2')) return null;
+  const i = g.players.findIndex((p) => p.id === actor);
+  let next = null;
+  for (let k = 1; k <= g.players.length && !next; k++) {
+    const p = g.players[(i + k) % g.players.length];
+    if (p.alive && p.id !== actor) next = p.id;
+  }
+  const owed = g.current === actor && g.cursed ? g.turnsLeft : 0;
+  return { next, turns: owed + (kind === 'curse2' ? 3 : 2), owed };
+}
+
 function chainEvent(e) {
   if (e.type === 'play') {
     clearTimeout(chainTimer);
-    chain = { actor: e.player, kinds: e.kinds, target: e.target, name: e.name, nopes: [], result: null };
+    chain = { actor: e.player, kinds: e.kinds, target: e.target, name: e.name, nopes: [], result: null, stack: curseStack(G(), e.player, e.kinds[0]) };
   } else if (e.type === 'nope' && chain && !chain.result) chain.nopes.push(e.player);
   else if (e.type === 'resolve' && chain && !chain.result) {
     // โชว์ผลค้างไว้สักครู่ก่อนหาย
@@ -333,7 +347,7 @@ function renderChain(fromEvent = false) {
   const pd = g && g.pending;
   // เข้ามากลางทาง (รีเฟรชหน้า) สร้างจากสถานะเกม ไม่รู้ว่าใครกด ไม่! บ้าง
   if (!chain && pd && pd.kind === 'window') {
-    chain = { actor: pd.actor, kinds: pd.kinds, target: pd.target, name: pd.name, nopes: Array(pd.nopeCount).fill(null), result: null };
+    chain = { actor: pd.actor, kinds: pd.kinds, target: pd.target, name: pd.name, nopes: Array(pd.nopeCount).fill(null), result: null, stack: curseStack(g, pd.actor, pd.kinds[0]) };
   }
   // สถานะบอกว่าไม่มีช่วงกด ไม่! แล้วแต่เราไม่ได้รับผลตัดสิน (เช่น คนเล่นออกจากห้อง) ล้างทิ้ง
   if (!fromEvent && chain && !chain.result && !(pd && pd.kind === 'window')) chain = null;
@@ -373,6 +387,12 @@ function renderChain(fromEvent = false) {
   else if (n === 0) text = `${nameOf(chain.actor)} เล่น ${cname}${target}`;
   else if (n % 2) { text = `ตอนนี้: ${cname} จะถูกยกเลิก`; tone = 'bad'; }
   else { text = `ตอนนี้: ${cname} จะมีผล${target}`; tone = 'good'; }
+  // สาปส่ง: บอกว่าคนถัดไปจะต้องเล่นกี่ตา (ทบจากที่ค้างอยู่)
+  const st = chain.stack;
+  if (st && st.next && chain.result !== 'cancelled' && !(chain.result === null && n % 2)) {
+    const tb = st.owed ? ` (ค้าง ${st.owed} + ${st.turns - st.owed})` : '';
+    text += ` → ${nameOf(st.next)} ต้องเล่น ${st.turns} ตา${tb}`;
+  }
   $('chain-status').textContent = text;
   $('chain-status').className = `chain-status ${tone}`.trim();
 }
@@ -654,6 +674,7 @@ export function initUI() {
     if (text) log(text);
     chainEvent(e);
     soundFor(e);
+    if (e.type === 'ghost') revealGhost(nameOf(e.player), e.saved);
     if (e.type === 'mirror' && e.player === you && e.cards) showMirror(e.cards);
     if (scene) scene.playEvent(e, S());
   });

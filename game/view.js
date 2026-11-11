@@ -26,6 +26,7 @@ function viewFor(g, playerId) {
     discardTop: g.discard.length ? g.discard[g.discard.length - 1] : null,
     current: g.current,
     turnsLeft: g.turnsLeft,
+    cursed: g.cursed,   // คนที่ถึงตากำลังโดนสาปอยู่ไหม (หน้าเว็บใช้คำนวณว่าสาปต่อจะทบเป็นกี่ตา)
     pending: publicPending(g.pending),
     winner: g.winner,
   };

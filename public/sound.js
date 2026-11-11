@@ -1,4 +1,4 @@
-// เสียงในเกม: 'shuffle' (สับกอง), 'card' (เล่น/ย้ายการ์ด), 'draw' (จั่ว)
+// เสียงในเกม: 'shuffle' (สับกอง), 'card' (เล่น/ย้ายการ์ด), 'draw' (จั่ว), 'ghost' (จั่วได้ผี), 'talisman' (ยันต์ปัดเป่า)
 // ถ้ามีไฟล์ public/sounds/<ชื่อ>.ogg|mp3|wav ใช้ไฟล์นั้น ไม่มีก็สังเคราะห์เสียงไพ่ด้วย Web Audio
 // ปิดเสียงได้ (จำไว้ในเครื่อง) เบราว์เซอร์ยอมให้เล่นเสียงหลังผู้ใช้แตะหน้าจอครั้งแรกเท่านั้น
 
@@ -105,7 +105,34 @@ function tap(a, t, level = 0.25) {
   o.stop(t + 0.07);
 }
 
+/** โน้ตเดียว: ขึ้นเร็ว แล้วจางลง */
+function tone(a, t, { type = 'sine', freq = 440, to = freq, dur = 0.5, level = 0.2, detune = 0 } = {}) {
+  const o = a.createOscillator();
+  o.type = type;
+  o.detune.value = detune;
+  o.frequency.setValueAtTime(freq, t);
+  if (to !== freq) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(level, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination);
+  o.start(t);
+  o.stop(t + dur + 0.05);
+}
+
 const SYNTH = {
+  ghost(a, t, gain) {
+    // ผีหลอก: เสียงตูมต่ำ + เสียงลมหวีด + โน้ตเพี้ยนสองตัวไถลลง
+    tone(a, t, { freq: 90, to: 38, dur: 0.7, level: 0.55 * gain });
+    swish(a, t, { freq: 900, to: 3800, dur: 0.45, q: 0.7, level: 0.35 * gain });
+    tone(a, t + 0.05, { type: 'sawtooth', freq: 620, to: 300, dur: 0.9, level: 0.07 * gain });
+    tone(a, t + 0.05, { type: 'sawtooth', freq: 655, to: 290, dur: 0.9, level: 0.07 * gain, detune: 15 });
+  },
+  talisman(a, t, gain) {
+    // ยันต์: กระดิ่งใสๆ ขึ้นทีละโน้ต
+    [988, 1319, 1976].forEach((f, i) => tone(a, t + i * 0.08, { freq: f, dur: 0.9, level: 0.16 * gain }));
+  },
   card(a, t, gain) {
     swish(a, t, { freq: 2600, to: 1500, dur: 0.12, level: 0.45 * gain });
     tap(a, t + 0.1, 0.22 * gain);
