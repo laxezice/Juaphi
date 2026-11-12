@@ -333,7 +333,7 @@ test('/api/sounds lists the sound files that exist', async (t) => {
   assert.equal(r.headers.get('content-type'), 'audio/ogg');
 });
 
-test('/api/art lists the card images that exist, and three.js is served', async (t) => {
+test('/api/art lists the card images that exist', async (t) => {
   const srv = await startServer(t);
   const fs = require('node:fs');
   const dir = path.join(__dirname, '..', 'public', 'cards');
@@ -356,14 +356,12 @@ test('/api/art lists the card images that exist, and three.js is served', async 
   assert.ok(!html.includes('__V__'));
   const v = html.match(/main\.js\?v=([\w-]+)/);
   assert.ok(v, 'main.js is versioned');
-  for (const f of ['style.css', '/ui.js', '/net.js', '/cards.js', '/scene.js', '/tray.js']) assert.ok(html.includes(`${f}?v=${v[1]}`), f);
+  for (const f of ['style.css', '/ui.js', '/net.js', '/cards.js', '/board2d.js', '/tray.js']) assert.ok(html.includes(`${f}?v=${v[1]}`), f);
   // ทุกโมดูลใน public/ ต้องอยู่ใน import map ไม่อย่างนั้นจะโหลดแบบไม่มีเลขรุ่น
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'public')).filter((x) => x.endsWith('.js') && x !== 'main.js')) {
     assert.ok(html.includes(`"/${f}": "/${f}?v=`), `${f} missing from the import map`);
   }
   assert.ok(html.includes(`content="${v[1]}"`), 'version meta for card images');
-  const three = await fetch(`http://127.0.0.1:${srv.port}/vendor/three.module.js`);
-  assert.equal(three.status, 200);
   const evil = await fetch(`http://127.0.0.1:${srv.port}/..%2fpackage.json`);
   assert.notEqual(evil.status, 200);
 });

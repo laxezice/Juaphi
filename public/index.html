@@ -13,11 +13,9 @@
   <link rel="stylesheet" href="style.css?v=__V__">
   <style>:root { --btn-draw: url("/buttons/draw.webp?v=__V__"); --btn-nope: url("/buttons/nope.webp?v=__V__"); }</style>
   <script type="importmap">{ "imports": {
-    "three": "/vendor/three.module.js",
     "/ui.js": "/ui.js?v=__V__",
     "/net.js": "/net.js?v=__V__",
     "/cards.js": "/cards.js?v=__V__",
-    "/scene.js": "/scene.js?v=__V__",
     "/tray.js": "/tray.js?v=__V__",
     "/sound.js": "/sound.js?v=__V__",
     "/reveal.js": "/reveal.js?v=__V__",
@@ -25,8 +23,7 @@
   } }</script>
 </head>
 <body>
-  <canvas id="scene" aria-hidden="true"></canvas>
-  <!-- กระดานแบบ 2D (board2d.js) ใช้แทน canvas เมื่อเลือกโหมด 2D -->
+  <!-- กระดาน (board2d.js) -->
   <div id="board2d" hidden></div>
 
   <!-- หน้าแรก -->
@@ -80,7 +77,6 @@
     </div>
     <div id="menu" class="menu" hidden>
       <div id="menu-players"></div>
-      <button id="board-toggle" class="btn ghost small"></button>
       <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
     </div>
     <div id="log" class="log" aria-live="polite"></div>

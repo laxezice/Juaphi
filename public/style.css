@@ -21,7 +21,6 @@ body {
 }
 [hidden] { display: none !important; }
 h1, h2, .title, .btn, .turn { font-family: 'Mitr', 'Sarabun', sans-serif; }
-#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .screen { position: fixed; inset: 0; overflow-y: auto; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
 #home, #lobby { background: radial-gradient(ellipse at 50% 0%, rgba(230, 150, 60, 0.18), transparent 60%), rgba(11, 10, 18, 0.82); }
 #home > *, #lobby > * { max-width: 480px; margin-left: auto; margin-right: auto; }
@@ -179,7 +178,7 @@ body.tray-open .actions, body.tray-open #hand, body.tray-open .log { visibility:
 .combo-text b { font: 600 16px 'Mitr', sans-serif; color: #fff3d6; }
 @media (prefers-reduced-motion: reduce) { .tcard, .info-banner { animation: none; transition: none; } }
 
-/* ---------- ปุ่มในเกม: คอลัมน์ปุ่มกลมด้านขวา ข้อความแนะนำด้านซ้าย ทั้งคู่อยู่เหนือการ์ดในมือ (--hand-h มาจาก scene.js) ---------- */
+/* ---------- ปุ่มในเกม: คอลัมน์ปุ่มกลมด้านขวา ข้อความแนะนำด้านซ้าย ทั้งคู่อยู่เหนือการ์ดในมือ (--hand-h มาจาก board2d.js) ---------- */
 .actions {
   left: 0; right: 0; bottom: calc(var(--hand-h, 170px) + 4px); padding: 0 12px;
   display: grid; grid-template-columns: 1fr auto; grid-template-areas: "prompt btns" "bar bar"; align-items: end; column-gap: 10px;

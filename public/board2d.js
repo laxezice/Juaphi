@@ -1,4 +1,4 @@
-// กระดาน 2D (HTML ล้วน ไม่ใช้ three.js): ใช้แทน scene.js ได้เลย หน้าที่เหมือนกันทุกอย่าง
+// กระดาน 2D (HTML ล้วน): ที่นั่ง กองกลาง การ์ดในมือ และ animation ของเหตุการณ์ในเกม
 //   createBoard(root, hooks) -> { setState(state, selected), playEvent(e, state), setHandHidden(v) }
 // คนอื่นอยู่ด้านบน กองจั่วกับกองทิ้งอยู่กลางจอ การ์ดในมืออยู่ล่างสุด
 // แตะการ์ด = hooks.onCardTap, แตะที่นั่ง = hooks.onPlayerTap, แตะกองจั่ว = hooks.onDeckTap

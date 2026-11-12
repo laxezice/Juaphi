@@ -16,7 +16,6 @@ const { botMove } = require('./game/bot');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC = path.join(__dirname, 'public');
-const VENDOR = path.join(__dirname, 'node_modules', 'three', 'build');
 const MIN_PLAYERS = 2;
 const MAX_SEATS = 8;                                         // รวมคนดู
 const NOPE_MS = Number(process.env.JUAPHI_NOPE_MS) || 2500;  // เวลากด "ไม่!"
@@ -48,8 +47,8 @@ function serveFile(res, file) {
     fs.readFile(file, (err, data) => {
       if (err) return notFound();
       const ext = path.extname(file);
-      // หน้าเว็บกับโค้ด: ให้เบราว์เซอร์ถามใหม่ทุกครั้ง (deploy แล้วได้ของใหม่ทันที) ส่วนภาพกับ three.js เก็บไว้ได้
-      const cache = ['.html', '.js', '.css'].includes(ext) && !file.startsWith(VENDOR) ? 'no-cache' : 'public, max-age=86400';
+      // หน้าเว็บกับโค้ด: ให้เบราว์เซอร์ถามใหม่ทุกครั้ง (deploy แล้วได้ของใหม่ทันที) ส่วนภาพกับเสียงเก็บไว้ได้
+      const cache = ['.html', '.js', '.css'].includes(ext) ? 'no-cache' : 'public, max-age=86400';
       res.writeHead(200, { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': cache });
       res.end(data);
     });
@@ -85,7 +84,6 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(names));
   }
-  if (p === '/vendor/three.module.js' || p === '/vendor/three.core.js') return serveFile(res, path.join(VENDOR, path.basename(p)));
   const file = path.normalize(path.join(PUBLIC, p));
   if (!file.startsWith(PUBLIC + path.sep)) { res.writeHead(403); return res.end(); }
   serveFile(res, file);
