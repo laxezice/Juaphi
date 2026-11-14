@@ -13,7 +13,10 @@ test('deckCount matches the rules for every player count', async () => {
     const col = n >= 6 ? 1 : 0;
     for (const [k, v] of Object.entries({ ...DECK_TABLE, ...EXTRA_TABLE })) assert.equal(deckCount(k, n), v[col], `${k} ${n}`);
     assert.equal(deckCount('ghost', n), n - 1);
+    assert.equal(deckCount('evil', n), 0);
+    assert.equal(deckCount('ghost', n, { evil: true }), n - 2);   // ผีร้ายแทนผี 1 ใบ
+    assert.equal(deckCount('evil', n, { evil: true }), 1);
     assert.equal(deckCount('talisman', n), n + SPARE_TALISMANS[col]);
   }
-  for (const k of KIND_ORDER) assert.ok(deckCount(k, 4) > 0, k);
+  for (const k of KIND_ORDER) assert.ok(deckCount(k, 4, { evil: true }) > 0, k);
 });

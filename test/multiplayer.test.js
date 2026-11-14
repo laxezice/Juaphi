@@ -124,6 +124,23 @@ test('extra cards are on in a new room; only the host can switch them, and not m
   assert.equal(a.state.room.extras, true);
 });
 
+test('the evil ghost option is off in a new room and only the host can switch it on', async (t) => {
+  const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_BOT_MS: '5000' });
+  const [a, b] = await setupRoom(srv, ['A', 'B']);
+  assert.equal(a.state.room.evil, false);
+  b.send({ t: 'options', evil: true });
+  await waitFor(() => b.errors.length === 1);
+  assert.equal(a.state.room.evil, false);
+  a.send({ t: 'options', evil: true });
+  await waitFor(() => a.state.room.evil === true && b.state.room.evil === true);
+  assert.equal(a.state.room.extras, false, 'switching one option leaves the other alone');
+  const watcher = await srv.client('W');
+  await waitFor(() => watcher.rooms && watcher.rooms.some((r) => r.code === a.room && r.evil));
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game);
+  assert.equal(a.state.game.evil, true);
+});
+
 test('the next game starts with the player who was out first', { timeout: 20000 }, async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: '3' });
   const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);

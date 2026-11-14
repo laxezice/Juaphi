@@ -6,10 +6,11 @@ const { buildDeck, shuffle } = require('./deck');
 
 /**
  * @param {string[]} playerIds ตามลำดับที่นั่ง
- * @param {{extras?: boolean, first?: string}} [opts] extras = ใส่การ์ดเสริมลงกอง, first = คนเริ่มก่อน (ไม่ระบุ = ที่นั่งแรก)
+ * @param {{extras?: boolean, evil?: boolean, first?: string}} [opts] extras = ใส่การ์ดเสริมลงกอง,
+ *   evil = ผีใบหนึ่งเป็นผีร้าย, first = คนเริ่มก่อน (ไม่ระบุ = ที่นั่งแรก)
  */
-function createGame(playerIds, rng, { extras = false, first } = {}) {
-  const { hands, deck } = buildDeck(playerIds.length, rng, { extras });
+function createGame(playerIds, rng, { extras = false, evil = false, first } = {}) {
+  const { hands, deck } = buildDeck(playerIds.length, rng, { extras, evil });
   return {
     players: playerIds.map((id, i) => ({ id, hand: hands[i], alive: true, grudge: false })),
     deck,
@@ -19,6 +20,7 @@ function createGame(playerIds, rng, { extras = false, first } = {}) {
     cursed: false,
     dir: 1,          // ทิศการเล่น 1 = ตามที่นั่ง, -1 = ย้อนกลับ (การ์ดเดินถอยหลัง)
     extras,
+    evil,
     pending: null,
     winner: null,
     firstOut: null,  // คนแรกที่โดนผีตกรอบ (เกมถัดไปเริ่มที่คนนี้)
@@ -86,22 +88,26 @@ function doDraw(g, me) {
  * ตาที่จบคือตาของ g.current เสมอ extra = ข้อมูลเพิ่มใน event (เช่น bottom, for)
  */
 function receive(g, me, card, events, extra = {}) {
-  if (card.kind !== 'ghost') {
+  if (!isGhost(card.kind)) {
     me.hand.push(card);
     events.push({ type: 'draw', player: me.id, ...extra, secret: { to: [me.id], card } });
     endTurn(g);
     return;
   }
-  const ti = me.hand.findIndex((c) => c.kind === 'talisman');
-  if (ti >= 0) {
-    g.discard.push(me.hand.splice(ti, 1)[0]);
+  // (user, 2026-11-14) ผีร้าย: ปัดเป่าได้ แต่ยันต์ในมือหมดทุกใบ ไม่ใช่ใบเดียว
+  const evil = card.kind === 'evil';
+  const tals = me.hand.filter((c) => c.kind === 'talisman');
+  if (tals.length) {
+    const used = evil ? tals : tals.slice(0, 1);
+    me.hand = me.hand.filter((c) => !used.includes(c));
+    g.discard.push(...used);
     g.pending = { kind: 'insert', player: me.id, ghost: card };
-    events.push({ type: 'ghost', player: me.id, saved: true, ...extra });
+    events.push({ type: 'ghost', player: me.id, saved: true, ...(evil ? { evil, used: used.length } : {}), ...extra });
     return;
   }
   kill(g, me);
   g.discard.push(card);
-  events.push({ type: 'ghost', player: me.id, saved: false, ...extra });
+  events.push({ type: 'ghost', player: me.id, saved: false, ...(evil ? { evil } : {}), ...extra });
   checkWinner(g, events);
   if (g.winner) return;
   if (g.current === me.id) passTurn(g, nextAlive(g, me.id), 1, false);
@@ -115,19 +121,20 @@ function doInsert(g, me, index) {
   g.deck.splice(index, 0, pd.ghost);
   g.pending = null;
   endTurn(g);
-  return done([{ type: 'insert', player: me.id }]);
+  return done([{ type: 'insert', player: me.id, ...(pd.ghost.kind === 'evil' ? { evil: true } : {}) }]);
 }
 
 const EXTRAS = new Set(['blackout', 'possess', 'grave', 'fate', 'reverse', 'bottom']);
 const SINGLE = new Set(['sneak', 'curse', 'curse2', 'mirror', 'wind', 'beg', ...EXTRAS]);
 const IMPS = new Set(['imp1', 'imp2', 'imp3', 'imp4', 'imp5']);
 const WILD = 'wild';   // ผีน้อยแปลงร่าง ใช้แทนผีน้อยแบบไหนก็ได้
-const ALL_KINDS = new Set(['ghost', 'talisman', 'nope', ...SINGLE, ...IMPS, WILD]);
+const isGhost = (k) => k === 'ghost' || k === 'evil';   // ผีร้ายก็เป็นผี
+const ALL_KINDS = new Set(['ghost', 'evil', 'talisman', 'nope', ...SINGLE, ...IMPS, WILD]);
 const isImp = (k) => IMPS.has(k) || k === WILD;
 /** ชุดผีน้อยที่ใช้ได้: ผีน้อยทั้งหมด และแบบที่ไม่ใช่ตัวแทนต้องเหมือนกัน (ตัวแทนล้วนก็ได้) */
 const impSet = (cards) => cards.every((c) => isImp(c.kind)) && new Set(cards.map((c) => c.kind).filter((k) => k !== WILD)).size <= 1;
 /** การ์ดในกองทิ้งที่ "ขุดหลุมศพ" หยิบได้: ไม่ใช่ผี และไม่ใช่ขุดหลุมศพด้วยกัน (กันวนไม่จบ) */
-const diggable = (g) => g.discard.filter((c) => c.kind !== 'ghost' && c.kind !== 'grave');
+const diggable = (g) => g.discard.filter((c) => !isGhost(c.kind) && c.kind !== 'grave');
 const randomIndex = (n, rng) => Math.floor(rng() * n);
 
 /** ตรวจว่าการ์ดชุดนี้เล่นได้ไหม คืนข้อความผิดพลาด หรือ null ถ้าเล่นได้ */
@@ -355,7 +362,7 @@ function removePlayer(g, id, rng) {
   p.hand = [];
   p.alive = false;
   p.grudge = false;
-  const ghosts = g.deck.map((c, i) => (c.kind === 'ghost' ? i : -1)).filter((i) => i >= 0);
+  const ghosts = g.deck.map((c, i) => (isGhost(c.kind) ? i : -1)).filter((i) => i >= 0);
   if (ghosts.length) g.deck.splice(ghosts[randomIndex(ghosts.length, rng)], 1);
   events.push({ type: 'left', player: id });
   checkWinner(g, events);
@@ -394,4 +401,4 @@ function act(g, playerId, action, rng) {
   }
 }
 
-module.exports = { createGame, act, resolvePending, removePlayer, waitingOn, autoAct, nextAlive, diggable, ALL_KINDS, EXTRAS };
+module.exports = { createGame, act, resolvePending, removePlayer, waitingOn, autoAct, nextAlive, diggable, isGhost, ALL_KINDS, EXTRAS };

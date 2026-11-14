@@ -55,9 +55,10 @@ function shuffle(arr, rng) {
 /**
  * แจกการ์ดตอนเริ่มเกม ทุกคนได้ยันต์ 1 ใบ + การ์ด HAND_SIZE ใบจากกองที่ยังไม่มีผี/ยันต์
  * แล้วค่อยใส่ผี (จำนวนคน - 1) กับยันต์สำรองลงกองแล้วสับ
+ * evil = ห้องเปิด "ผีร้าย": ผีใบหนึ่งในนั้นเป็นผีร้าย (จำนวนผีรวมเท่าเดิม)
  * @returns {{ hands: {uid:string,kind:string}[][], deck: {uid:string,kind:string}[] }}
  */
-function buildDeck(playerCount, rng, { extras = false } = {}) {
+function buildDeck(playerCount, rng, { extras = false, evil = false } = {}) {
   const col = playerCount >= 6 ? 1 : 0;
   let n = 0;
   const card = (kind) => ({ uid: 'c' + (++n), kind });
@@ -71,7 +72,7 @@ function buildDeck(playerCount, rng, { extras = false } = {}) {
   for (let p = 0; p < playerCount; p++) {
     hands.push([card('talisman'), ...pool.splice(0, HAND_SIZE)]);
   }
-  for (let i = 0; i < playerCount - 1; i++) pool.push(card('ghost'));
+  for (let i = 0; i < playerCount - 1; i++) pool.push(card(evil && i === 0 ? 'evil' : 'ghost'));
   for (let i = 0; i < SPARE_TALISMANS[col]; i++) pool.push(card('talisman'));
   shuffle(pool, rng);
   return { hands, deck: pool };

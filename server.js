@@ -105,7 +105,7 @@ function newCode() {
 
 function createRoom() {
   const r = {
-    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: true,   // ห้องใหม่เปิดการ์ดเสริมไว้ก่อน
+    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: true, evil: false,   // ห้องใหม่เปิดการ์ดเสริมไว้ก่อน
     windowTimer: null, windowEndsAt: 0, takeoverTimer: null, takeoverFor: null, idleTimer: null,
   };
   rooms.set(r.code, r);
@@ -121,7 +121,7 @@ function listRooms() {
   const out = [];
   for (const r of rooms.values()) {
     if (!humanOnline(r)) continue;
-    out.push({ code: r.code, name: `ห้องของ ${hostName(r)}`, players: r.players.length, max: MAX_SEATS, status: inGame(r) ? 'play' : 'lobby', extras: r.extras });
+    out.push({ code: r.code, name: `ห้องของ ${hostName(r)}`, players: r.players.length, max: MAX_SEATS, status: inGame(r) ? 'play' : 'lobby', extras: r.extras, evil: r.evil });
   }
   out.sort((a, b) => (a.status === b.status ? 0 : a.status === 'lobby' ? -1 : 1) || a.code.localeCompare(b.code));
   return out;
@@ -157,6 +157,7 @@ function stateFor(r, p) {
       name: `ห้องของ ${hostName(r)}`,
       hostId: r.hostId,
       extras: r.extras,   // ตัวเลือกห้อง: ใส่การ์ดเสริมในเกมถัดไป
+      evil: r.evil,       // ตัวเลือกห้อง: ผีใบหนึ่งเป็นผีร้าย
       players: r.players.map((x) => ({ id: x.id, name: x.name, online: x.online, seat: x.seat, bot: !!x.bot })),
       names: r.names,
     },
@@ -288,7 +289,7 @@ function startGame(r) {
   const prev = r.game && r.game.firstOut;
   const fromPrev = !!prev && ids.includes(prev);
   const first = fromPrev ? prev : ids[SEED != null ? 0 : Math.floor(Math.random() * ids.length)];
-  r.game = G.createGame(ids, r.rng, { extras: r.extras, first });
+  r.game = G.createGame(ids, r.rng, { extras: r.extras, evil: r.evil, first });
   r.windowEndsAt = 0;
   afterChange(r, [{ type: 'start', player: first, reason: fromPrev ? 'firstOut' : 'random' }]);
 }
@@ -406,6 +407,7 @@ wss.on('connection', (ws) => {
         if (!isHost) return fail('หัวห้องเป็นคนตั้งค่าห้อง');
         if (inGame(r)) return fail('เปลี่ยนได้หลังจบเกม');
         if (typeof m.extras === 'boolean') r.extras = m.extras;
+        if (typeof m.evil === 'boolean') r.evil = m.evil;
         return broadcast(r);
       }
       case 'addBot': {

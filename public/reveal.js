@@ -14,21 +14,22 @@ async function back() {
   return backUrl;
 }
 
-/** who: ชื่อคนที่จั่ว ('คุณ' ถ้าเป็นเรา) saved: มียันต์ปัดเป่า */
-export function revealGhost(who, saved) {
-  queue = queue.then(() => run(who, saved)).catch(() => {});
+/** who: ชื่อคนที่จั่ว ('คุณ' ถ้าเป็นเรา) saved: มียันต์ปัดเป่า evil: ผีร้าย used: ยันต์ที่ใช้ไป */
+export function revealGhost(who, saved, { evil = false, used = 1 } = {}) {
+  queue = queue.then(() => run(who, saved, evil, used)).catch(() => {});
   return queue;
 }
 
-async function run(who, saved) {
+async function run(who, saved, evil, used) {
   const box = $('reveal');
   const card = $('reveal-card');
   const tal = $('reveal-talisman');
-  const [ghostUrl, backSrc, talUrl] = await Promise.all([cardFaceUrl('ghost'), back(), cardFaceUrl('talisman')]);
+  const [ghostUrl, backSrc, talUrl] = await Promise.all([cardFaceUrl(evil ? 'evil' : 'ghost'), back(), cardFaceUrl('talisman')]);
   $('reveal-face').src = ghostUrl;
   $('reveal-back').src = backSrc;
   tal.querySelector('img').src = talUrl;
   $('reveal-name').textContent = who;     // ชื่อคนที่จั่ว เห็นตั้งแต่ก่อนพลิก
+  box.querySelector('.reveal-who span').textContent = evil ? 'จั่วได้ผีร้าย!' : 'จั่วได้ผี!';
   $('reveal-text').textContent = '';
   $('reveal-sub').textContent = '';
   box.className = 'reveal';
@@ -48,7 +49,9 @@ async function run(who, saved) {
     box.classList.add('saved');            // ยันต์พุ่งเข้ามาปัดเป่า
     sound.play('talisman');
     $('reveal-text').textContent = 'ยันต์ช่วยไว้ทัน!';
-    $('reveal-sub').textContent = who === 'คุณ' ? 'คุณรอด เลือกที่ซ่อนผีกลับเข้ากอง' : `${who} รอด แล้วจะแอบซ่อนผีกลับเข้ากอง`;
+    $('reveal-sub').textContent = evil
+      ? (who === 'คุณ' ? `ผีร้ายกินยันต์คุณไป ${used} ใบ เลือกที่ซ่อนมันกลับเข้ากอง` : `${who} รอด แต่ผีร้ายกินยันต์ไป ${used} ใบ`)
+      : (who === 'คุณ' ? 'คุณรอด เลือกที่ซ่อนผีกลับเข้ากอง' : `${who} รอด แล้วจะแอบซ่อนผีกลับเข้ากอง`);
   } else {
     box.classList.add('dead');
     $('reveal-text').textContent = 'ตกรอบ!';

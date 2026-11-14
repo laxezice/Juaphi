@@ -63,8 +63,10 @@ export function describe(e, you, nameOf) {
     case 'dig': return e.empty ? 'กองทิ้งไม่มีอะไรให้ขุด' : `${n(e.player)} ขุด ${cardName(e.card.kind)} ขึ้นจากหลุมศพ`;
     case 'fate': return `${n(e.player)} ผูกดวงการ์ด ${e.n} ใบบนกอง`;
     case 'reverse': return 'เดินถอยหลัง! ลำดับการเล่นกลับทิศ';
-    case 'ghost': return e.saved ? `${n(e.player)} จั่วได้ผี! แต่มียันต์ปัดเป่าไว้` : `${n(e.player)} โดนผีหลอก ตกรอบ!`;
-    case 'insert': return `${n(e.player)} แอบเสียบผีกลับเข้ากอง`;
+    case 'ghost':
+      if (e.evil) return e.saved ? `${n(e.player)} จั่วได้ผีร้าย! ต้องใช้ยันต์ทั้ง ${e.used} ใบปัดเป่า` : `${n(e.player)} โดนผีร้ายเล่นงาน ตกรอบ!`;
+      return e.saved ? `${n(e.player)} จั่วได้ผี! แต่มียันต์ปัดเป่าไว้` : `${n(e.player)} โดนผีหลอก ตกรอบ!`;
+    case 'insert': return `${n(e.player)} แอบเสียบ${e.evil ? 'ผีร้าย' : 'ผี'}กลับเข้ากอง`;
     case 'play': {
       const ks = e.kinds;
       const what = ks.length > 1 ? `ผีน้อย${CARD_INFO[ks[0]].name} ${ks.length} ใบ` : cardName(ks[0]);
@@ -159,7 +161,7 @@ function pickName(target) {
     key: 'name',
     title: 'ทวงการ์ดอะไร?',
     detail: `ถ้า ${nameOf(target)} มีการ์ดใบนี้ ต้องยกให้คุณ ถ้าไม่มีก็ไม่ได้อะไร`,
-    cards: kindsFor(G() && G().extras).map((k) => ({ kind: k, key: k })),
+    cards: kindsFor(G() && G().extras, G() && G().evil).map((k) => ({ kind: k, key: k })),
     confirm: (c) => `ทวง ${cardName(c.kind)}`,
   });
 }
@@ -294,7 +296,7 @@ function renderHome() {
   for (const r of net.rooms) {
     const li = document.createElement('li');
     const full = r.players >= r.max;
-    li.innerHTML = `<div><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}${r.extras ? ' · <span class="extra-tag">+การ์ดเสริม</span>' : ''}</div></div>
+    li.innerHTML = `<div><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}${r.extras ? ' · <span class="extra-tag">+การ์ดเสริม</span>' : ''}${r.evil ? ' · <span class="extra-tag evil-tag">+ผีร้าย</span>' : ''}</div></div>
       <span class="badge ${r.status}">${r.status === 'play' ? (full ? 'เต็ม' : 'กำลังเล่น · เข้าไปดู') : full ? 'เต็ม' : 'รอคน · เข้าร่วม'}</span>`;
     li.onclick = () => {
       if (!ensureName()) return;
@@ -330,7 +332,8 @@ function renderLobby(s) {
   $('add-bot').hidden = !isHost;
   $('add-bot').disabled = full;
   $('add-bot').textContent = full ? `ห้องเต็มแล้ว (${MAX_SEATS} ที่)` : 'เพิ่มบอต';
-  renderExtras(s, 'extras');
+  renderOption(s, 'extras', 'extras');
+  renderOption(s, 'evil', 'evil');
   $('start').hidden = !isHost;
   $('start').disabled = s.room.players.length < 2;
   $('lobby-hint').textContent = isHost
@@ -338,14 +341,14 @@ function renderLobby(s) {
     : 'รอหัวห้องกดเริ่มเกม';
 }
 
-/** สวิตช์ "การ์ดเสริม" (ห้องรอ / กล่องจบเกม): หัวห้องกดได้ คนอื่นเห็นสถานะ */
-function renderExtras(s, id) {
+/** สวิตช์ตัวเลือกห้อง "การ์ดเสริม" / "ผีร้าย" (ห้องรอ / กล่องจบเกม): หัวห้องกดได้ คนอื่นเห็นเฉพาะที่เปิดอยู่ */
+function renderOption(s, id, key) {
   const box = $(id);
   const isHost = s.room.hostId === s.you;
-  box.querySelector('input').checked = !!s.room.extras;
+  box.querySelector('input').checked = !!s.room[key];
   box.querySelector('input').disabled = !isHost;
   box.classList.toggle('readonly', !isHost);
-  box.hidden = !isHost && !s.room.extras;
+  box.hidden = !isHost && !s.room[key];
 }
 
 function renderHand(g) {
@@ -562,7 +565,8 @@ function renderGame(s) {
     $('again-bot').hidden = !isHost || s.room.players.length >= MAX_SEATS;
     $('again-hint').textContent = !isHost ? 'รอหัวห้องเริ่มรอบใหม่'
       : online < 2 ? 'เหลือคุณคนเดียว เพิ่มบอตหรือชวนเพื่อนเข้าห้องก่อนเริ่มรอบใหม่' : '';
-    renderExtras(s, 'again-extras');
+    renderOption(s, 'again-extras', 'extras');
+    renderOption(s, 'again-evil', 'evil');
   }
 
   // รายชื่อในเมนู
@@ -597,6 +601,11 @@ const extrasOn = () => {
   const s = S();
   return !!(s && (s.game ? s.game.extras : s.room.extras));
 };
+/** เกมนี้ (หรือเกมถัดไป) มีผีร้ายไหม */
+const evilOn = () => {
+  const s = S();
+  return !!(s && (s.game ? s.game.evil : s.room.evil));
+};
 const seatCount = () => {
   const s = S();
   return s ? (s.game ? s.game.players.length : s.room.players.length) : 4;
@@ -606,17 +615,18 @@ function openCardList() {
   const n = Math.max(2, seatCount());
   const hand = handCards();
   const extras = extrasOn();
-  openPanel(`การ์ดทั้งหมด (เกม ${n} คน${extras ? ' · มีการ์ดเสริม' : ''})`, (body) => {
+  const evil = evilOn();
+  openPanel(`การ์ดทั้งหมด (เกม ${n} คน${extras ? ' · มีการ์ดเสริม' : ''}${evil ? ' · มีผีร้าย' : ''})`, (body) => {
     const grid = document.createElement('div');
     grid.className = 'card-grid';
-    for (const k of kindsFor(extras)) {
+    for (const k of kindsFor(extras, evil)) {
       const item = document.createElement('div');
       item.className = 'card-item';
       const mine = hand.filter((c) => c.kind === k).length;
       const info = document.createElement('div');
       info.className = 'card-info';
       info.innerHTML = `<b>${esc(cardName(k))}${CARD_INFO[k].extra ? ' <span class="extra-tag">เสริม</span>' : ''}</b><span>${esc(CARD_INFO[k].text)}</span>`
-        + `<small>ในเกม ${deckCount(k, n)} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
+        + `<small>ในเกม ${deckCount(k, n, { evil })} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
       item.append(cardEl(k), info);
       grid.append(item);
     }
@@ -789,6 +799,7 @@ export function initUI() {
   $('again').onclick = () => send({ t: 'start' });
   $('again-bot').onclick = () => send({ t: 'addBot' });
   for (const id of ['extras', 'again-extras']) $(id).querySelector('input').onchange = (e) => send({ t: 'options', extras: e.target.checked });
+  for (const id of ['evil', 'again-evil']) $(id).querySelector('input').onchange = (e) => send({ t: 'options', evil: e.target.checked });
   $('draw').onclick = () => { selected.clear(); act({ type: 'draw' }); };
   $('play').onclick = () => playSelected();
   $('nope').onclick = () => {
@@ -820,7 +831,7 @@ export function initUI() {
     if (text) log(text);
     chainEvent(e);
     soundFor(e);
-    if (e.type === 'ghost') revealGhost(nameOf(e.player), e.saved);
+    if (e.type === 'ghost') revealGhost(nameOf(e.player), e.saved, { evil: !!e.evil, used: e.used || 1 });
     if (e.type === 'mirror' && e.player === you && e.cards) showMirror(e.cards);
     if (scene) scene.playEvent(e, S());
   });

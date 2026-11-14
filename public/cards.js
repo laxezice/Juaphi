@@ -1,6 +1,8 @@
 // ข้อมูลการ์ดที่หน้าเว็บใช้ ชื่อ คำอธิบายสั้น และสี
 export const CARD_INFO = {
   ghost: { name: 'ผี', text: 'จั่วได้แล้วไม่มียันต์ = ตกรอบ', color: '#7a1f2b' },
+  // ผีร้าย (evil: มีเฉพาะห้องที่เปิดตัวเลือก "ผีร้าย" แทนผี 1 ใบ)
+  evil: { name: 'ผีร้าย', evil: true, text: 'จั่วได้ต้องใช้ยันต์ทั้งหมดในมือปัดเป่า ไม่มียันต์ = ตกรอบ', color: '#4a0f1a' },
   talisman: { name: 'ยันต์', text: 'ปัดเป่าผีให้เอง แล้วเสียบผีกลับเข้ากอง', color: '#b8862b' },
   nope: { name: 'ไม่!', text: 'ยกเลิกการ์ดที่เพิ่งเล่น ใช้ซ้อนกันได้', color: '#b0352f' },
   sneak: { name: 'ย่องหนี', text: 'จบตาโดยไม่ต้องจั่ว', color: '#2f6f8f' },
@@ -26,8 +28,8 @@ export const CARD_INFO = {
 
 export const KIND_ORDER = Object.keys(CARD_INFO);
 export const EXTRA_KINDS = KIND_ORDER.filter((k) => CARD_INFO[k].extra);
-/** การ์ดที่มีในเกมนี้ (ไม่มีการ์ดเสริมถ้าห้องไม่ได้เปิด) */
-export const kindsFor = (extras) => KIND_ORDER.filter((k) => extras || !CARD_INFO[k].extra);
+/** การ์ดที่มีในเกมนี้ (ไม่มีการ์ดเสริม / ผีร้าย ถ้าห้องไม่ได้เปิด) */
+export const kindsFor = (extras, evil = false) => KIND_ORDER.filter((k) => (extras || !CARD_INFO[k].extra) && (evil || !CARD_INFO[k].evil));
 
 // จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
 const DECK = {
@@ -38,17 +40,18 @@ const DECK = {
 };
 const SPARE_TALISMANS = [2, 3];
 
-/** มีการ์ดแบบนี้กี่ใบในเกมที่มี n คน (ผี = n − 1, ยันต์ = แจกคนละใบ + สำรองในกอง) */
-export function deckCount(kind, n) {
+/** มีการ์ดแบบนี้กี่ใบในเกมที่มี n คน (ผี = n − 1 รวมผีร้ายถ้าเปิด, ยันต์ = แจกคนละใบ + สำรองในกอง) */
+export function deckCount(kind, n, { evil = false } = {}) {
   const col = n >= 6 ? 1 : 0;
-  if (kind === 'ghost') return n - 1;
+  if (kind === 'ghost') return n - 1 - (evil ? 1 : 0);
+  if (kind === 'evil') return evil ? 1 : 0;
   if (kind === 'talisman') return n + SPARE_TALISMANS[col];
   return DECK[kind] ? DECK[kind][col] : 0;
 }
 
 // ---------- วาดหน้าการ์ดลง canvas (ใช้เป็น texture ในฉาก 3 มิติ) ----------
 const GLYPH = {
-  ghost: 'ผี', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜',
+  ghost: 'ผี', evil: 'ร้าย', talisman: 'ยันต์', nope: 'ไม่!', curse2: '×2', mirror: '◎', wind: '〜',
   wild: '?', blackout: 'ดับ', possess: 'เข้า', grave: 'ขุด', fate: 'ดวง', reverse: '↺', bottom: '↓',
 };
 export const CARD_W = 500;
@@ -167,7 +170,7 @@ async function paintCardFace(kind) {
     ctx.fillText(GLYPH[kind] || info.name.slice(0, 1), CARD_W / 2, 255);
   }
   // ผีเป็นการ์ดอันตราย ตัวหนังสือสีแดงทั้งใบ
-  const ink = kind === 'ghost' ? { name: '#ff3b3b', text: '#ff9a9a' } : { name: '#ffe9b8', text: 'rgba(241,233,218,0.92)' };
+  const ink = kind === 'ghost' || kind === 'evil' ? { name: '#ff3b3b', text: '#ff9a9a' } : { name: '#ffe9b8', text: 'rgba(241,233,218,0.92)' };
   // แถบล่างกับแถบบน: เงาจางๆ ให้ภาพยังเห็นชัด ตัวหนังสืออ่านออกด้วยเงาของตัวอักษรเอง
   const band = ctx.createLinearGradient(0, CARD_H * 0.74, 0, CARD_H);
   band.addColorStop(0, 'rgba(10,8,16,0)');

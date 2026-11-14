@@ -32,7 +32,8 @@ function viewFor(g, playerId) {
     turnsLeft: g.turnsLeft,
     cursed: g.cursed,
     dir: g.dir === -1 ? -1 : 1,
-    extras: !!g.extras,   // คนที่ถึงตากำลังโดนสาปอยู่ไหม (หน้าเว็บใช้คำนวณว่าสาปต่อจะทบเป็นกี่ตา)
+    extras: !!g.extras,
+    evil: !!g.evil,       // มีผีร้ายในกอง   // คนที่ถึงตากำลังโดนสาปอยู่ไหม (หน้าเว็บใช้คำนวณว่าสาปต่อจะทบเป็นกี่ตา)
     pending: publicPending(g.pending),
     winner: g.winner,
   };

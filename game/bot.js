@@ -38,7 +38,8 @@ function botMove(v, you, rng, memo) {
   if (pd && pd.kind === 'fate') {
     // บอตยังต้องจั่วเอง ดันผีลงไปใต้สุดของส่วนที่เห็น
     if (pd.player !== you || !me.fate) return null;
-    const order = [...me.fate.filter((c) => c.kind !== 'ghost'), ...me.fate.filter((c) => c.kind === 'ghost')];
+    const bad = (c) => c.kind === 'ghost' || c.kind === 'evil';
+    const order = [...me.fate.filter((c) => !bad(c)), ...me.fate.filter(bad)];
     return { type: 'fate', order: order.map((c) => c.uid) };
   }
   if (pd) return null;

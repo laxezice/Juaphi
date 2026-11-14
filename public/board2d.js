@@ -277,7 +277,9 @@ export async function createBoard(root, hooks) {
         const st = seats.get(e.player);
         if (st) pulse(st.box, 'alert', 3600);
         await wait(1600);
-        return fly(e.saved ? face.talisman : face.ghost, rectOf(e.player), centerOf(discard), { scale: 1.1 });
+        // ผีร้าย: ยันต์ทั้งมือบินลงกองทิ้งทีละใบ
+        if (e.saved) return Promise.all(Array.from({ length: e.used || 1 }, (_, i) => wait(i * 140).then(() => fly(face.talisman, rectOf(e.player), centerOf(discard), { scale: 1.1 }))));
+        return fly(face[e.evil ? 'evil' : 'ghost'], rectOf(e.player), centerOf(discard), { scale: 1.1 });
       }
       case 'insert':
         return fly(backUrl, rectOf(e.player), centerOf(deck), { ms: 600 });
