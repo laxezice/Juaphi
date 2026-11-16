@@ -74,14 +74,15 @@ id ของการ์ด: `ghost evil talisman nope sneak curse curse2 mirror
 
 ## ขึ้นเซิร์ฟเวอร์
 
-อยู่บนเครื่อง Vultr (207.148.66.224) เครื่องเดียวกับ Watch & Learn, sai-suek และ Vanguard ไฟล์ทั้งหมดอยู่ใน `tools/deploy/`
+อยู่บนเครื่อง 129.121.129.56 (ย้ายมาจาก Vultr 207.148.66.224 เมื่อ 2026-11-15) ไฟล์ทั้งหมดอยู่ใน `tools/deploy/`
+ตั้งเครื่องใหม่ทั้งเครื่อง (Node, swap, firewall, cloudflared) ด้วย `tools/deploy/setup-machine.sh` ครั้งเดียว ทุกเกมบนเครื่องใช้ร่วมกัน
 
 | | |
 |---|---|
 | พอร์ต (ฟังที่ 127.0.0.1) | 3030 |
 | user ที่รัน | `juaphi` |
 | โค้ด | `/opt/juaphi` (root เป็นเจ้าของ เกมอ่านได้อย่างเดียว) |
-| repo บนเซิร์ฟเวอร์ | `/opt/juaphi.git` (remote ชื่อ `vultr`) |
+| repo บนเซิร์ฟเวอร์ | `/opt/juaphi.git` (remote ชื่อ `server`) |
 | โดเมน | juaphi.laxezice.win |
 
 เกมไม่เก็บข้อมูลลงดิสก์ ห้องอยู่ในหน่วยความจำ ทุกครั้งที่อัปเดตหรือรีสตาร์ต ห้องที่เปิดอยู่จะปิด
@@ -107,7 +108,7 @@ powershell -ExecutionPolicy Bypass -File tools\deploy\rooms.ps1
 ### ขึ้นครั้งแรก / ย้ายเครื่อง
 
 1. บนเซิร์ฟเวอร์: คัดลอก `tools/deploy/setup-server.sh` ขึ้นไปแล้วรัน `bash setup-server.sh` (สร้าง user, repo เปล่า และโฟลเดอร์โค้ด)
-2. ในเครื่องนี้: `git remote add vultr root@<IP>:/opt/juaphi.git` แล้ว ssh เข้าเครื่องหนึ่งครั้งให้รู้จัก host key
+2. ในเครื่องนี้: `git remote add server root@<IP>:/opt/juaphi.git` แล้ว ssh เข้าเครื่องหนึ่งครั้งให้รู้จัก host key
 3. รัน `deploy.ps1` (ย้ายเครื่องใช้ `-Server root@<IP ใหม่>`)
 4. เพิ่มใน `/etc/cloudflared/config.yml` เหนือบรรทัด `- service: http_status:404`
 
@@ -118,3 +119,11 @@ powershell -ExecutionPolicy Bypass -File tools\deploy\rooms.ps1
 
    แล้ว `cloudflared tunnel route dns <tunnel> juaphi.laxezice.win` หนึ่งครั้ง และ `systemctl restart cloudflared`
    (ทุกเกมบนเครื่องจะหลุดการเชื่อมต่อแป๊บหนึ่ง)
+
+เครื่อง 129.121.129.56 ใช้ tunnel ของตัวเองชื่อ `games` (Vanguard ยังอยู่เครื่อง Vultr กับ tunnel `vanguard`)
+การสร้าง tunnel กับย้าย DNS เจ้าของบัญชี Cloudflare ทำเอง จากเครื่องนี้ที่ login cloudflared ไว้แล้ว:
+tunnel `games` (ID `0830ec10-de98-41bc-b424-ab4d73f328bd`) รันบนเครื่องใหม่เป็น service `cloudflared` config อยู่ที่ `/etc/cloudflared/config.yml`
+ย้ายโดเมนมาเครื่องใหม่ (ใช้ ID และ config ว่าง เพราะ `~/.cloudflared/config.yml` ในเครื่องนี้ผูกกับ tunnel `vanguard`
+ถ้าไม่ข้าม cloudflared จะใช้ tunnel นั้นแทนชื่อที่พิมพ์):
+`cloudflared --config <ไฟล์ว่าง> tunnel route dns --overwrite-dns 0830ec10-de98-41bc-b424-ab4d73f328bd <host>`
+ย้อนกลับไปเครื่องเก่าด้วยคำสั่งเดียวกันแต่ใช้ ID ของ `vanguard` (`5eb319c2-3578-43a4-bce7-d6f68bb8fd49`)

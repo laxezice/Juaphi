@@ -24,4 +24,4 @@ mkdir -p "$APP"
 git config --global --get-all safe.directory | grep -qx "$APP" || git config --global --add safe.directory "$APP"
 git config --global --get-all safe.directory | grep -qx "$REPO" || git config --global --add safe.directory "$REPO"
 
-echo "setup done: on the PC  git remote add vultr root@207.148.66.224:$REPO  (once), then run tools/deploy/deploy.ps1"
+echo "setup done: on the PC  git remote add server root@129.121.129.56:$REPO  (once), then run tools/deploy/deploy.ps1"
