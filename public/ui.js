@@ -26,6 +26,12 @@ const nameOf = (id) => {
 };
 const cardName = (k) => (CARD_INFO[k]?.imp ? `ผีน้อย${CARD_INFO[k].name}` : CARD_INFO[k]?.name || k);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const assetUrl = (path) => `${path}?v=${encodeURIComponent(document.querySelector('meta[name=juaphi-version]')?.content || '')}`;
+function avatarUrl(id) {
+  let h = 0;
+  for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return assetUrl(`/cards/imp${h % 5 + 1}.webp`);
+}
 
 // ---------- ข้อความแจ้ง ----------
 function toast(msg) {
@@ -296,12 +302,16 @@ function renderHome() {
   for (const r of net.rooms) {
     const li = document.createElement('li');
     const full = r.players >= r.max;
-    li.innerHTML = `<div><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}${r.extras ? ' · <span class="extra-tag">+การ์ดเสริม</span>' : ''}${r.evil ? ' · <span class="extra-tag evil-tag">+ผีร้าย</span>' : ''}</div></div>
+    li.className = 'room-item';
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.innerHTML = `<img class="room-art" src="${assetUrl(`/cards/${r.status === 'play' ? 'ghost' : 'back'}.webp`)}" width="40" height="56" alt=""><div class="room-info"><b>${esc(r.name)}</b><div class="muted">${r.players}/${r.max} คน · รหัส ${esc(r.code)}${r.extras ? ' · <span class="extra-tag">+การ์ดเสริม</span>' : ''}${r.evil ? ' · <span class="extra-tag evil-tag">+ผีร้าย</span>' : ''}</div></div>
       <span class="badge ${r.status}">${r.status === 'play' ? (full ? 'เต็ม' : 'กำลังเล่น · เข้าไปดู') : full ? 'เต็ม' : 'รอคน · เข้าร่วม'}</span>`;
     li.onclick = () => {
       if (!ensureName()) return;
       joinRoom(r.code);
     };
+    li.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } };
     list.append(li);
   }
   $('no-rooms').hidden = net.rooms.length > 0;
@@ -320,11 +330,12 @@ function renderLobby(s) {
   $('lobby-code').textContent = s.room.code;
   const isHost = s.room.hostId === s.you;
   const ul = $('lobby-players');
+  $('lobby-count').textContent = `${s.room.players.length} / ${MAX_SEATS} คน`;
   ul.innerHTML = '';
   for (const p of s.room.players) {
     const li = document.createElement('li');
-    if (!p.online) li.className = 'offline';
-    li.innerHTML = `<span>${esc(p.name)}${p.bot ? ' <span class="badge">บอต</span>' : ''}${p.id === s.room.hostId ? ' 👑' : ''}${p.id === s.you ? ' (คุณ)' : ''}${p.online ? '' : ' · หลุด'}</span>`;
+    li.className = 'lobby-player' + (!p.online ? ' offline' : '') + (p.id === s.you ? ' is-you' : '');
+    li.innerHTML = `<img class="player-avatar" src="${avatarUrl(p.id)}" width="48" height="48" alt=""><span class="player-name">${esc(p.name)}${p.bot ? ' <span class="badge">บอต</span>' : ''}${p.id === s.room.hostId ? ' <span class="host-mark" title="หัวห้อง">♛</span>' : ''}${p.id === s.you ? ' <small>(คุณ)</small>' : ''}${p.online ? '' : ' · หลุด'}</span>`;
     if (isHost && p.id !== s.you) li.append(chip(p.bot ? 'เอาออก' : 'เตะ', () => send({ t: 'kick', id: p.id })));
     ul.append(li);
   }

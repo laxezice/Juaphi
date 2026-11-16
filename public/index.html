@@ -5,18 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0a12">
   <title>จั่วผี</title>
+  <meta name="description" content="เกมการ์ดบ้านผีสิง เล่นกับเพื่อน 2–8 คน ใครจั่วได้ผีแล้วไม่มียันต์ ตกรอบ!">
+  <link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon.png?v=__V__">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
   <!-- __V__ คือเลขรุ่นที่เซิร์ฟเวอร์ใส่ให้ตอนส่งหน้านี้ deploy ใหม่ = URL ใหม่ เบราว์เซอร์จะไม่ใช้โค้ดเก่าที่เก็บไว้ -->
   <meta name="juaphi-version" content="__V__">
   <link rel="stylesheet" href="style.css?v=__V__">
-  <style>:root { --btn-draw: url("/buttons/draw.webp?v=__V__"); --btn-nope: url("/buttons/nope.webp?v=__V__"); }</style>
+  <style>:root { --btn-draw: url("/buttons/draw.webp?v=__V__"); --btn-nope: url("/buttons/nope.webp?v=__V__"); --brand-mark: url("/brand/mark.webp?v=__V__"); }</style>
   <script type="importmap">{ "imports": {
     "/ui.js": "/ui.js?v=__V__",
     "/net.js": "/net.js?v=__V__",
     "/cards.js": "/cards.js?v=__V__",
     "/tray.js": "/tray.js?v=__V__",
+    "/tray-scroll.js": "/tray-scroll.js?v=__V__",
     "/sound.js": "/sound.js?v=__V__",
     "/reveal.js": "/reveal.js?v=__V__",
     "/board2d.js": "/board2d.js?v=__V__"
@@ -28,38 +31,68 @@
 
   <!-- หน้าแรก -->
   <main id="home" class="screen" hidden>
-    <h1 class="logo">จั่วผี</h1>
-    <p class="tag">จั่วการ์ดไปเรื่อยๆ ใครจั่วได้ <b>ผี</b> แล้วไม่มี <b>ยันต์</b> ตกรอบ คนสุดท้ายที่รอดชนะ</p>
-    <label class="field">ชื่อของคุณ
-      <input id="name" maxlength="20" autocomplete="nickname" placeholder="เช่น ต้น">
-    </label>
-    <button id="create" class="btn primary">สร้างห้องใหม่</button>
-    <section class="rooms">
-      <h2>ห้องที่เปิดอยู่</h2>
-      <ul id="room-list"></ul>
-      <p id="no-rooms" class="muted">ยังไม่มีห้องเปิดอยู่ สร้างห้องแล้วชวนเพื่อนได้เลย</p>
-    </section>
+    <div class="home-shell">
+      <header class="site-header">
+        <div class="brand-lockup"><img src="/brand/mark.webp?v=__V__" width="64" height="64" alt=""><div><b class="brand-name">จั่วผี</b><span>เกมการ์ดบ้านผีสิง</span></div></div>
+        <span class="site-pill">2–8 คน · เล่นกับเพื่อน</span>
+      </header>
+      <div class="home-hero">
+        <section class="home-copy" aria-labelledby="home-title">
+          <p class="eyebrow">ชวนเพื่อนมาเสี่ยงดวง</p>
+          <h1 id="home-title" class="logo">จั่ว<span>ผี</span></h1>
+          <p class="hero-lead">ไพ่ใบต่อไป… ใครจะโดน?</p>
+          <p class="tag">จั่วได้ <b>ผี</b> แล้วไม่มี <b>ยันต์</b> ตกรอบ<br>เล่นการ์ดแกล้งเพื่อน แล้วเอาตัวรอดเป็นคนสุดท้าย</p>
+          <div class="hero-cards" aria-hidden="true">
+            <figure class="hero-card hero-card-left"><img src="/cards/imp2.webp?v=__V__" width="500" height="700" alt=""><figcaption>จับคู่ผีน้อย</figcaption></figure>
+            <figure class="hero-card hero-card-center"><img src="/cards/ghost.webp?v=__V__" width="500" height="700" alt=""><figcaption>ระวังผีในกอง</figcaption></figure>
+            <figure class="hero-card hero-card-right"><img src="/cards/talisman.webp?v=__V__" width="500" height="700" alt=""><figcaption>เก็บยันต์ไว้ให้ดี</figcaption></figure>
+          </div>
+        </section>
+        <section class="join-card" aria-labelledby="join-title">
+          <img class="join-mascot" src="/brand/mark.webp?v=__V__" width="128" height="128" alt="">
+          <h2 id="join-title">เข้าบ้านผีสิง</h2>
+          <p class="muted">ใส่ชื่อ แล้วเข้าห้องเล่นกับเพื่อน</p>
+          <label class="field">ชื่อของคุณ<input id="name" maxlength="20" autocomplete="nickname" placeholder="เช่น ต้น"></label>
+          <button id="create" class="btn primary">สร้างห้องใหม่</button>
+          <p class="join-note">เล่นผ่านเบราว์เซอร์ · ไม่ต้องสมัคร</p>
+        </section>
+      </div>
+      <section class="rooms" aria-labelledby="rooms-title">
+        <div class="section-head"><h2 id="rooms-title">ห้องที่เปิดอยู่</h2><span class="muted">เลือกห้องเพื่อเข้าร่วม</span></div>
+        <ul id="room-list"></ul>
+        <div id="no-rooms" class="room-empty"><img src="/brand/mark.webp?v=__V__" width="88" height="88" alt=""><div><b>บ้านยังเงียบอยู่เลย</b><p class="muted">ยังไม่มีห้องเปิดอยู่ สร้างห้องแล้วชวนเพื่อนเข้ามาได้เลย</p></div></div>
+      </section>
+    </div>
   </main>
 
   <!-- ห้องรอ -->
   <main id="lobby" class="screen" hidden>
-    <header class="bar">
-      <div><div id="lobby-name" class="title"></div><div class="muted">รหัสห้อง <b id="lobby-code"></b></div></div>
+    <div class="lobby-shell">
+    <header class="bar lobby-top">
+      <div class="brand-lockup"><img src="/brand/mark.webp?v=__V__" width="56" height="56" alt=""><div><b class="brand-name">จั่วผี</b><span>ห้องรอ</span></div></div>
       <button id="lobby-leave" class="btn ghost small">ออกจากห้อง</button>
     </header>
+    <section class="lobby-card">
+    <div class="lobby-heading"><p class="eyebrow">รวมพลก่อนเจอผี</p><h1 id="lobby-name" class="title"></h1><div class="room-code">รหัสห้อง <b id="lobby-code"></b></div></div>
     <button id="invite" class="btn">คัดลอกลิงก์เชิญ</button>
+    <div class="section-head"><h2>ผู้เล่นในห้อง</h2><span id="lobby-count" class="site-pill"></span></div>
     <ul id="lobby-players" class="players"></ul>
     <button id="add-bot" class="btn" hidden>เพิ่มบอต</button>
     <label id="extras" class="toggle" hidden>
       <input type="checkbox">
+      <img class="option-art" src="/cards/fate.webp?v=__V__" width="40" height="56" alt="">
       <span class="toggle-text"><b>การ์ดเสริม</b><small>ไฟดับ · ผีเข้า · ขุดหลุมศพ · ผูกดวง · เดินถอยหลัง · จั่วก้นกอง</small></span>
     </label>
     <label id="evil" class="toggle" hidden>
       <input type="checkbox">
+      <img class="option-art" src="/cards/evil.webp?v=__V__" width="40" height="56" alt="">
       <span class="toggle-text"><b>ผีร้าย</b><small>ผี 1 ใบกลายเป็นผีร้าย จั่วได้ต้องใช้ยันต์ทั้งหมดในมือ</small></span>
     </label>
     <p id="lobby-hint" class="muted"></p>
     <button id="start" class="btn primary" hidden>เริ่มเกม</button>
+    </section>
+    <p class="lobby-footnote">ใครจั่วได้ผี… อย่าลืมดูว่ามียันต์ไหม</p>
+    </div>
   </main>
 
   <!-- ในเกม -->
@@ -108,6 +141,8 @@
     </footer>
     <div id="winner" class="winner" hidden>
       <div class="winner-box">
+        <img class="winner-art" src="/brand/mark.webp?v=__V__" width="116" height="116" alt="">
+        <p class="eyebrow">รอดจากบ้านผีสิง</p>
         <div id="winner-text"></div>
         <label id="again-extras" class="toggle" hidden>
           <input type="checkbox">
@@ -139,8 +174,11 @@
       <span id="tray-tag" class="info-tag">เลือกการ์ด</span>
       <div id="tray-title" class="info-text"></div>
       <div id="tray-detail" class="info-detail"></div>
+      <p id="tray-help" class="tray-help" hidden>ปัดซ้ายขวา เลื่อนเมาส์ หรือใช้ลูกศรเพื่อดูการ์ดเพิ่มเติม</p>
     </div>
     <div id="tray-cards" class="tray"></div>
+    <button id="tray-prev" class="tray-nav tray-prev" type="button" aria-label="เลื่อนการ์ดไปทางซ้าย" aria-controls="tray-cards" hidden>‹</button>
+    <button id="tray-next" class="tray-nav tray-next" type="button" aria-label="เลื่อนการ์ดไปทางขวา" aria-controls="tray-cards" hidden>›</button>
     <div class="tray-bar">
       <button id="tray-cancel" class="btn ghost small">ยกเลิก</button>
       <button id="tray-ok" class="btn primary small">ยืนยัน</button>

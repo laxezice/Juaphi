@@ -129,9 +129,26 @@ body.tray-open .actions, body.tray-open #hand, body.tray-open .log { visibility:
 .tray {
   position: absolute; left: 0; right: 0; bottom: max(70px, calc(env(safe-area-inset-bottom) + 62px));
   display: flex; align-items: flex-end; gap: 12px; padding: 30px 16px 8px; overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--gold) rgba(255, 255, 255, 0.08);
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
 }
-.tray::-webkit-scrollbar { display: none; }
+.tray::-webkit-scrollbar { height: 8px; }
+.tray::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 8px; }
+.tray::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); }
+.tray:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.tray-help { margin: 8px 0 0; color: var(--gold); font-size: 12px; }
+.tray-nav {
+  position: absolute; z-index: 2; bottom: calc(max(70px, env(safe-area-inset-bottom) + 62px) + var(--tray-h) / 2 - 18px);
+  display: grid; place-items: center; width: 42px; height: 48px; padding: 0; border: 1px solid var(--gold); border-radius: 12px;
+  background: #211c30; color: var(--gold); font-size: 32px; cursor: pointer; box-shadow: 0 4px 16px #0009;
+}
+.tray-prev { left: 10px; }
+.tray-next { right: 10px; }
+.tray-nav:disabled { opacity: 0.35; cursor: default; }
+.tray-nav:focus-visible, .tcard:focus-visible { outline: 3px solid var(--ghost); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .tray { padding-left: 64px; padding-right: 64px; scroll-padding-inline: 64px; } }
+@media (pointer: coarse) { .tray-nav { display: none; } }
 /* อยู่กลางจอเมื่อพอดี และเลื่อนได้โดยไม่ตกขอบซ้ายเมื่อการ์ดเยอะ */
 .tray > :first-child { margin-left: auto; }
 .tray > :last-child { margin-right: auto; }
@@ -518,3 +535,112 @@ body.shake #game, body.shake .reveal-card { animation: shake 0.5s linear; }
 }
 .tcard .torder.set { color: #2a1a00; background: #ffd23f; border: 3px solid #fff3c4; box-shadow: 0 0 14px rgba(255, 210, 63, 0.95); animation: torder-in 0.25s ease-out; }
 @keyframes torder-in { from { transform: translateX(-50%) scale(0.4); } to { transform: translateX(-50%) scale(1); } }
+
+/* ---------- ตัวตนของบ้านผี: ใช้ artwork ชุดเดียวกับการ์ด ---------- */
+#home, #lobby {
+  background: radial-gradient(ellipse at 18% 18%, #39252f66, transparent 48%),
+    radial-gradient(ellipse at 85% 10%, #25403844, transparent 40%), #0b0a12;
+}
+#home > .home-shell { max-width: 1100px; }
+#lobby > .lobby-shell { max-width: 740px; }
+.home-shell, .lobby-shell { width: 100%; margin: 0 auto; }
+.site-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand-lockup { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-lockup img { object-fit: contain; flex: none; }
+.brand-lockup > div { display: flex; flex-direction: column; gap: 1px; }
+.brand-name { color: #ffe0a0; font: 600 24px/1.2 'Mitr', sans-serif; }
+.brand-lockup span { font-size: 12px; color: var(--muted); }
+.site-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  font-size: 12px; color: #d3c8b7; background: #ffffff06; border: 1px solid var(--line); border-radius: 999px; }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); align-items: center; gap: 52px; padding: 24px 0 32px; }
+.eyebrow { margin: 0 0 8px; color: var(--gold); font: 400 13px 'Mitr', sans-serif; }
+.home-copy .logo { margin: 0; text-align: left; font-size: clamp(72px, 7.8vw, 104px); line-height: 1.15; letter-spacing: 0; color: #ffe1a0; text-shadow: 0 5px 0 #6a391d, 0 12px 40px #e6b04d1c; }
+.home-copy .logo span { color: #b9edcf; text-shadow: 0 5px 0 #245a44, 0 12px 40px #8ed6b722; }
+.hero-lead { margin: 14px 0 8px; font: 400 24px/1.4 'Mitr', sans-serif; color: #fff1d7; }
+.home-copy .tag { text-align: left; line-height: 1.75; margin: 0; color: #b9afa0; }
+.home-copy .tag b { color: #efe4cf; }
+.hero-cards { position: relative; width: min(390px, 100%); height: 196px; margin-top: 22px; }
+.hero-card { position: absolute; left: 50%; top: 8px; width: 116px; height: 162px; margin: 0;
+  border: 2px solid #b89049; border-radius: 10px; background: #201b2b; box-shadow: 0 14px 28px #0008; overflow: hidden; }
+.hero-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hero-card-left { transform: translateX(-140px) rotate(-14deg); }
+.hero-card-center { z-index: 1; transform: translateX(-50%) rotate(-2deg); }
+.hero-card-right { transform: translateX(24px) rotate(14deg); }
+.hero-card figcaption { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; background: #15101be8; color: #f1d99f; font-size: 10px; padding: 5px 1px; }
+.join-card, .lobby-card { background: linear-gradient(145deg, #241d30e8, #16131fe8); border: 1px solid #e6b04d38; border-radius: 24px; box-shadow: 0 18px 60px #0004; }
+.join-card { padding: 22px 28px 24px; text-align: center; }
+.join-mascot { display: block; width: 112px; height: 112px; object-fit: contain; margin: -2px auto 4px; filter: drop-shadow(0 4px 14px #9fe3c81c); }
+.join-card h2 { font-size: 24px; margin: 0 0 4px; color: #fff1d7; }
+.join-card > .muted { margin: 0; }
+.join-card .field { text-align: left; margin: 18px 0 14px; }
+.join-card input { background: #0d0b1480; }
+.join-card .btn { min-height: 52px; box-shadow: 0 5px 0 #6d4418; transition: filter 0.15s; }
+.join-card .btn:hover { filter: brightness(1.08); }
+.join-note { margin: 16px 0 0; color: #a79c8d; font-size: 12px; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.section-head h2 { font: 400 18px 'Mitr', sans-serif; margin: 0; color: #eadfcf; }
+.rooms { padding-bottom: 20px; }
+.rooms h2 { margin: 0; }
+#room-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#room-list .room-item { margin: 0; gap: 12px; padding: 14px; transition: border-color 0.15s, background 0.15s; }
+.room-item:hover { background: #e6b04d0b !important; border-color: #e6b04d66 !important; }
+.room-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.room-art { flex: none; width: 40px; height: 56px; border: 1px solid #ab8147; border-radius: 5px; object-fit: cover; }
+.room-info { flex: 1; min-width: 0; }
+.room-info > b { display: block; overflow-wrap: anywhere; font: 400 15px 'Mitr', sans-serif; }
+.room-info .muted { font-size: 12px; }
+.room-empty { display: flex; justify-content: center; align-items: center; gap: 18px; padding: 20px;
+  background: #ffffff02; border: 1px dashed #d6b27330; border-radius: 18px; }
+.room-empty img { flex: none; object-fit: contain; opacity: 0.8; }
+.room-empty b { font: 400 16px 'Mitr', sans-serif; color: #ddcdaa; }
+.room-empty p { margin: 4px 0 0; }
+.lobby-top { margin: 4px 0 22px; }
+#lobby .lobby-top .btn { margin: 0; }
+.lobby-card { padding: 26px; }
+.lobby-heading { text-align: center; margin-bottom: 20px; }
+.lobby-heading .title { font: 600 28px/1.4 'Mitr', sans-serif; margin: 4px 0 10px; overflow-wrap: anywhere; }
+.room-code { display: inline-block; padding: 6px 16px; font-size: 13px; color: var(--muted); background: #0003; border: 1px dashed #e6b04d50; border-radius: 10px; }
+.room-code b { color: #ffe0a0; font-size: 20px; letter-spacing: 3px; margin-left: 8px; }
+.lobby-card .section-head { margin-top: 22px; }
+.lobby-card .players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.lobby-card .players li { min-width: 0; margin: 0; padding: 10px; gap: 10px; }
+.lobby-player.is-you { border-color: #9fe3c84a; background: #9fe3c809; }
+.player-avatar { flex: none; width: 44px; height: 44px; object-fit: cover; object-position: 50% 30%; border-radius: 50%; background: #fff; border: 2px solid #e6b04d77; }
+.player-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.player-name small { color: var(--ghost); }
+.host-mark { color: var(--gold); font-size: 20px; }
+.lobby-player .chip { flex: none; min-height: 32px; font-size: 12px; padding: 4px 8px; }
+.option-art { flex: none; width: 34px; height: 48px; border: 1px solid #e6b04d55; border-radius: 5px; object-fit: cover; }
+.toggle input { margin: 0; }
+.lobby-footnote { text-align: center; color: #8f8476; font-size: 13px; margin: 18px 0 8px; }
+#winner { padding: 16px; }
+.winner-box { width: min(420px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; background: linear-gradient(145deg, #2a2233, #14121e); }
+.winner-art { display: block; margin: 0 auto 10px; object-fit: contain; }
+.panel-head { gap: 12px; }
+.panel-head::before { content: ''; flex: none; width: 34px; height: 38px; background: var(--brand-mark) center / contain no-repeat; }
+.panel-head .title { flex: 1; }
+.conn { display: flex; align-items: center; gap: 7px; }
+.conn::before { content: ''; width: 26px; height: 26px; background: var(--brand-mark) center / contain no-repeat; }
+@media (max-width: 760px) {
+  .home-hero { grid-template-columns: 1fr; gap: 20px; padding: 24px 0; }
+  .site-header .site-pill { font-size: 11px; padding: 4px 8px; }
+  .site-header .brand-lockup img { width: 48px; height: 48px; }
+  .brand-name { font-size: 21px; }
+  .home-copy { text-align: center; }
+  .home-copy .logo { text-align: center; font-size: 68px; }
+  .home-copy .tag { text-align: center; font-size: 14px; }
+  .hero-lead { font-size: 20px; margin-top: 8px; }
+  .hero-cards { display: none; }
+  .join-card { padding: 18px 22px 22px; }
+  .join-mascot { width: 88px; height: 88px; }
+  .join-card h2 { font-size: 21px; }
+  #room-list { grid-template-columns: 1fr; }
+  .room-empty { gap: 12px; padding: 18px 14px; }
+  .room-empty img { width: 64px; height: 64px; }
+  .section-head > .muted { font-size: 12px; }
+  .lobby-card { padding: 20px 16px; }
+}
+@media (max-width: 520px) {
+  .lobby-card .players { grid-template-columns: 1fr; }
+  .site-header .brand-lockup span { display: none; }
+}

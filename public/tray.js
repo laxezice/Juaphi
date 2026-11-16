@@ -2,6 +2,7 @@
 // แตะการ์ดเพื่อเลือก (ยกขึ้นพร้อมเรืองทอง) แล้วกดยืนยัน ในมือถือปัดแถวการ์ดซ้ายขวาได้
 // และแผงเต็มจอ (รายการการ์ด, คอมโบ)
 import { CARD_INFO, cardFaceUrl } from './cards.js';
+import { attachTrayScroll } from './tray-scroll.js';
 
 const $ = (id) => document.getElementById(id);
 let current = null;   // { key, resolve }
@@ -10,6 +11,25 @@ let listener = () => {};
 /** ui บอกฉาก 3 มิติให้ซ่อนการ์ดในมือตอนแถวนี้เปิด */
 export function onTrayChange(fn) { listener = fn; }
 export const trayKey = () => (current ? current.key : null);
+
+function showTray() {
+  $('tray-layer').hidden = false;
+  document.body.classList.add('tray-open');
+  const row = $('tray-cards');
+  row.tabIndex = 0;
+  row.setAttribute('aria-label', 'แถวการ์ด ใช้ลูกศรซ้ายขวาเพื่อเลื่อน');
+  attachTrayScroll(row, { prev: $('tray-prev'), next: $('tray-next'), hint: $('tray-help') }).reset();
+}
+
+function makePickable(el, choose) {
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-pressed', 'false');
+  el.onclick = choose;
+  el.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!e.repeat) choose(); }
+  };
+}
 
 /** รูปการ์ดหนึ่งใบ (ภาพจริงถ้ามี ไม่มีก็การ์ดที่วาดเอง) */
 export function cardEl(kind, { tag, cls = '' } = {}) {
@@ -47,18 +67,22 @@ export function openTray({ key, title, detail = '', tagText = 'เลือก�
   row.innerHTML = '';
   let chosen = null;
   const ok = $('tray-ok');
-  const label = () => (typeof confirm === 'function' ? (chosen ? confirm(cards.find((c) => c.key === chosen)) : 'เลือกการ์ดก่อน') : confirm);
+  const label = () => (typeof confirm === 'function' ? (chosen !== null ? confirm(cards.find((c) => c.key === chosen)) : 'เลือกการ์ดก่อน') : confirm);
   const refresh = () => {
     ok.textContent = label();
     ok.disabled = pick === 1 && chosen === null;
-    for (const el of row.children) el.classList.toggle('selected', el.dataset.key === String(chosen));
+    for (const el of row.children) {
+      const selected = chosen !== null && el.dataset.key === String(chosen);
+      el.classList.toggle('selected', selected);
+      if (pick) el.setAttribute('aria-pressed', String(selected));
+    }
   };
   cards.forEach((c, i) => {
     const el = cardEl(c.kind, { tag: c.tag, cls: pick ? 'pickable' : '' });
     el.dataset.key = String(c.key);
     el.style.animationDelay = `${Math.min(i, 10) * 25}ms`;
     if (pick) {
-      el.onclick = () => { chosen = chosen === c.key ? null : c.key; refresh(); };
+      makePickable(el, () => { chosen = chosen === c.key ? null : c.key; refresh(); });
       // แตะซ้ำใบที่เลือกอยู่ = ยืนยันเลย
       el.ondblclick = () => { chosen = c.key; refresh(); ok.click(); };
     }
@@ -66,8 +90,7 @@ export function openTray({ key, title, detail = '', tagText = 'เลือก�
   });
   $('tray-cancel').hidden = !cancel;
   if (cancel) $('tray-cancel').textContent = cancel;
-  $('tray-layer').hidden = false;
-  document.body.classList.add('tray-open');
+  showTray();
   refresh();
   listener(true);
   return new Promise((resolve) => {
@@ -101,11 +124,11 @@ export function openOrderTray({ key, title, detail = '', tagText = 'เรีย
     const num = document.createElement('span');
     num.className = 'torder';
     el.append(num);
-    el.onclick = () => {
+    makePickable(el, () => {
       const at = chosen.indexOf(c.key);
       if (at >= 0) chosen.splice(at, 1); else chosen.push(c.key);
       refresh();
-    };
+    });
     row.append(el);
     return el;
   });
@@ -118,14 +141,14 @@ export function openOrderTray({ key, title, detail = '', tagText = 'เรีย
       num.textContent = String(o.indexOf(k) + 1);
       num.classList.toggle('set', set);
       el.classList.toggle('selected', set);
+      el.setAttribute('aria-pressed', String(set));
     });
     ok.textContent = chosen.length ? 'ยืนยันลำดับนี้' : 'คงลำดับเดิม';
     ok.disabled = false;
     reset.hidden = !chosen.length;
   }
   reset.textContent = 'เริ่มใหม่';
-  $('tray-layer').hidden = false;
-  document.body.classList.add('tray-open');
+  showTray();
   refresh();
   listener(true);
   return new Promise((resolve) => {
