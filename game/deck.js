@@ -2,9 +2,15 @@
 // deck[0] คือการ์ดใบบนสุดของกอง
 
 const HAND_SIZE = 7;
+// (user, 2026-11-16) กองเยอะไป: กองจั่วหลังแจกเหลือเท่านี้ใน 2-4 คน (นับผีกับยันต์สำรองด้วย)
+const DECK_AFTER_DEAL = 30;
+// (user, 2026-11-16) เกินสี่คน กองหลังแจกเพิ่มคนละ DECK_GROW ใบ
+const DECK_GROW = 5;
+/** กองจั่วหลังแจกในเกม n คน: 2-4 คน = DECK_AFTER_DEAL, 5 คน = +5, 6 คน = +10 ... */
+const deckAfterDeal = (n) => DECK_AFTER_DEAL + DECK_GROW * Math.max(0, n - 4);
 
-// จำนวนการ์ดแต่ละแบบ [2-5 คน, 6-8 คน] แก้ตัวเลขกติกาตรงนี้ได้
-// ชุดหลักรวม 56 ใบ (2-5 คน) / 112 ใบ (6-8 คน) ก่อนแจก ไม่นับผีกับยันต์
+// สัดส่วนการ์ดแต่ละแบบ [2-5 คน, 6-8 คน] แก้ตัวเลขกติกาตรงนี้ได้
+// ตารางนี้เป็นแค่สัดส่วน: poolCounts ย่อ/ขยายให้กองหลังแจกเหลือ deckAfterDeal(n) ใบ
 const DECK_TABLE = {
   nope: [7, 14],
   sneak: [5, 10],
@@ -30,6 +36,38 @@ const EXTRA_TABLE = {
   bottom: [2, 4],    // จั่วก้นกอง
 };
 const SPARE_TALISMANS = [2, 3];
+
+/**
+ * จำนวนการ์ดแต่ละแบบที่ใส่ในเกม n คน: ย่อหรือขยายตารางตามสัดส่วน ให้กองหลังแจกเหลือ deckAfterDeal(n) ใบพอดี
+ * (นับผีกับยันต์สำรองที่ใส่ทีหลังด้วย)
+ * (user, 2026-11-16) ปัดเศษเป็นกลุ่ม: ผีน้อยทุกแบบเท่ากัน การ์ดเสริมทุกแบบเท่ากัน ทุกแบบปัดแบบปกติ (ใบที่น้อยอย่าง
+ * สาปส่ง ×2 เลยไม่ลดลงเมื่อคนเพิ่ม) แล้วการ์ดเดี่ยวแบ่งที่เหลือตามสัดส่วน
+ */
+function poolCounts(n, { extras = false } = {}) {
+  const col = n >= 6 ? 1 : 0;
+  const table = extras ? { ...DECK_TABLE, ...EXTRA_TABLE } : DECK_TABLE;
+  const kinds = Object.keys(table);
+  const total = kinds.reduce((s, k) => s + table[k][col], 0);
+  const target = deckAfterDeal(n) + HAND_SIZE * n - (n - 1) - SPARE_TALISMANS[col];
+  const groups = [kinds.filter((k) => /^imp\d$/.test(k)), ...(extras ? [Object.keys(EXTRA_TABLE)] : [])];
+  const grouped = new Set(groups.flat());
+  const exact = (k) => (table[k][col] * target) / total;
+  const out = {};
+  for (const g of groups) { const c = Math.max(1, Math.round(exact(g[0]))); for (const k of g) out[k] = c; }
+  // การ์ดเดี่ยวแบ่งที่เหลือตามสัดส่วนของมันเอง แล้วส่วนต่างจากการปัดเพิ่มลดที่ใบเยอะสุดก่อน (เท่ากันใช้ลำดับในตาราง)
+  const singles = kinds.filter((k) => !grouped.has(k));
+  const room = target - [...grouped].reduce((s, k) => s + out[k], 0);
+  const singlesTotal = singles.reduce((s, k) => s + table[k][col], 0);
+  const share = (k) => (table[k][col] * room) / singlesTotal;
+  for (const k of singles) out[k] = Math.max(1, Math.floor(share(k)));
+  let left = target - kinds.reduce((s, k) => s + out[k], 0);
+  // ที่ยังขาด: ให้ใบที่เศษเหลือมากสุดก่อน (ใบที่ได้ขั้นต่ำ 1 ไปแล้วเศษติดลบ ไม่ได้เพิ่ม)
+  const byRest = [...singles].sort((x, y) => (share(y) - out[y]) - (share(x) - out[x]));
+  for (let i = 0; left > 0; i = (i + 1) % byRest.length) { out[byRest[i]] += 1; left -= 1; }
+  // ขั้นต่ำ 1 ใบทำให้เกิน: ลดจากใบที่มีมากสุด
+  while (left < 0) { const k = singles.reduce((x, y) => (out[y] > out[x] ? y : x)); out[k] -= 1; left += 1; }
+  return out;
+}
 
 /** ตัวสุ่มที่กำหนดผลได้ (mulberry32) ใช้ในเทสต์ */
 function makeRng(seed) {
@@ -63,9 +101,8 @@ function buildDeck(playerCount, rng, { extras = false, evil = false } = {}) {
   let n = 0;
   const card = (kind) => ({ uid: 'c' + (++n), kind });
   const pool = [];
-  const table = extras ? { ...DECK_TABLE, ...EXTRA_TABLE } : DECK_TABLE;
-  for (const [kind, counts] of Object.entries(table)) {
-    for (let i = 0; i < counts[col]; i++) pool.push(card(kind));
+  for (const [kind, count] of Object.entries(poolCounts(playerCount, { extras }))) {
+    for (let i = 0; i < count; i++) pool.push(card(kind));
   }
   shuffle(pool, rng);
   const hands = [];
@@ -78,4 +115,4 @@ function buildDeck(playerCount, rng, { extras = false, evil = false } = {}) {
   return { hands, deck: pool };
 }
 
-module.exports = { HAND_SIZE, DECK_TABLE, EXTRA_TABLE, SPARE_TALISMANS, makeRng, shuffle, buildDeck };
+module.exports = { HAND_SIZE, DECK_AFTER_DEAL, DECK_GROW, deckAfterDeal, DECK_TABLE, EXTRA_TABLE, SPARE_TALISMANS, poolCounts, makeRng, shuffle, buildDeck };

@@ -626,7 +626,7 @@ function openCardList() {
       const info = document.createElement('div');
       info.className = 'card-info';
       info.innerHTML = `<b>${esc(cardName(k))}${CARD_INFO[k].extra ? ' <span class="extra-tag">เสริม</span>' : ''}</b><span>${esc(CARD_INFO[k].text)}</span>`
-        + `<small>ในเกม ${deckCount(k, n, { evil })} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
+        + `<small>ในเกม ${deckCount(k, n, { evil, extras })} ใบ${mine ? ` · ในมือคุณ ${mine}` : ''}</small>`;
       item.append(cardEl(k), info);
       grid.append(item);
     }

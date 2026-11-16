@@ -31,22 +31,59 @@ export const EXTRA_KINDS = KIND_ORDER.filter((k) => CARD_INFO[k].extra);
 /** การ์ดที่มีในเกมนี้ (ไม่มีการ์ดเสริม / ผีร้าย ถ้าห้องไม่ได้เปิด) */
 export const kindsFor = (extras, evil = false) => KIND_ORDER.filter((k) => (extras || !CARD_INFO[k].extra) && (evil || !CARD_INFO[k].evil));
 
-// จำนวนในกองแต่ละแบบ [2-5 คน, 6-8 คน] ต้องตรงกับ DECK_TABLE ใน game/deck.js (test/cards-info.test.js เช็กให้)
-const DECK = {
+// สำเนาของ game/deck.js: ตารางสัดส่วน ค่าคงที่ และ poolCounts ต้องเหมือนกันทุกตัว (test/cards-info.test.js เช็กให้)
+const HAND_SIZE = 7;
+const DECK_AFTER_DEAL = 30;
+// (user, 2026-11-16) เกินสี่คน กองหลังแจกเพิ่มคนละ DECK_GROW ใบ
+const DECK_GROW = 5;
+/** กองจั่วหลังแจกในเกม n คน: 2-4 คน = DECK_AFTER_DEAL, 5 คน = +5, 6 คน = +10 ... */
+const deckAfterDeal = (n) => DECK_AFTER_DEAL + DECK_GROW * Math.max(0, n - 4);
+const DECK_TABLE = {
   nope: [7, 14], sneak: [5, 10], curse: [4, 8], curse2: [1, 2], mirror: [6, 12], wind: [5, 10], beg: [5, 10],
   imp1: [4, 8], imp2: [4, 8], imp3: [4, 8], imp4: [4, 8], imp5: [4, 8], wild: [3, 6],
-  // การ์ดเสริม ต้องตรงกับ EXTRA_TABLE
-  blackout: [2, 4], possess: [2, 4], grave: [2, 4], fate: [2, 4], reverse: [2, 4], bottom: [2, 4],
 };
+const EXTRA_TABLE = { blackout: [2, 4], possess: [2, 4], grave: [2, 4], fate: [2, 4], reverse: [2, 4], bottom: [2, 4] };
 const SPARE_TALISMANS = [2, 3];
 
+/**
+ * จำนวนการ์ดแต่ละแบบที่ใส่ในเกม n คน: ย่อหรือขยายตารางตามสัดส่วน ให้กองหลังแจกเหลือ deckAfterDeal(n) ใบพอดี
+ * (นับผีกับยันต์สำรองที่ใส่ทีหลังด้วย)
+ * (user, 2026-11-16) ปัดเศษเป็นกลุ่ม: ผีน้อยทุกแบบเท่ากัน การ์ดเสริมทุกแบบเท่ากัน ทุกแบบปัดแบบปกติ (ใบที่น้อยอย่าง
+ * สาปส่ง ×2 เลยไม่ลดลงเมื่อคนเพิ่ม) แล้วการ์ดเดี่ยวแบ่งที่เหลือตามสัดส่วน
+ */
+function poolCounts(n, { extras = false } = {}) {
+  const col = n >= 6 ? 1 : 0;
+  const table = extras ? { ...DECK_TABLE, ...EXTRA_TABLE } : DECK_TABLE;
+  const kinds = Object.keys(table);
+  const total = kinds.reduce((s, k) => s + table[k][col], 0);
+  const target = deckAfterDeal(n) + HAND_SIZE * n - (n - 1) - SPARE_TALISMANS[col];
+  const groups = [kinds.filter((k) => /^imp\d$/.test(k)), ...(extras ? [Object.keys(EXTRA_TABLE)] : [])];
+  const grouped = new Set(groups.flat());
+  const exact = (k) => (table[k][col] * target) / total;
+  const out = {};
+  for (const g of groups) { const c = Math.max(1, Math.round(exact(g[0]))); for (const k of g) out[k] = c; }
+  // การ์ดเดี่ยวแบ่งที่เหลือตามสัดส่วนของมันเอง แล้วส่วนต่างจากการปัดเพิ่มลดที่ใบเยอะสุดก่อน (เท่ากันใช้ลำดับในตาราง)
+  const singles = kinds.filter((k) => !grouped.has(k));
+  const room = target - [...grouped].reduce((s, k) => s + out[k], 0);
+  const singlesTotal = singles.reduce((s, k) => s + table[k][col], 0);
+  const share = (k) => (table[k][col] * room) / singlesTotal;
+  for (const k of singles) out[k] = Math.max(1, Math.floor(share(k)));
+  let left = target - kinds.reduce((s, k) => s + out[k], 0);
+  // ที่ยังขาด: ให้ใบที่เศษเหลือมากสุดก่อน (ใบที่ได้ขั้นต่ำ 1 ไปแล้วเศษติดลบ ไม่ได้เพิ่ม)
+  const byRest = [...singles].sort((x, y) => (share(y) - out[y]) - (share(x) - out[x]));
+  for (let i = 0; left > 0; i = (i + 1) % byRest.length) { out[byRest[i]] += 1; left -= 1; }
+  // ขั้นต่ำ 1 ใบทำให้เกิน: ลดจากใบที่มีมากสุด
+  while (left < 0) { const k = singles.reduce((x, y) => (out[y] > out[x] ? y : x)); out[k] -= 1; left += 1; }
+  return out;
+}
+
 /** มีการ์ดแบบนี้กี่ใบในเกมที่มี n คน (ผี = n − 1 รวมผีร้ายถ้าเปิด, ยันต์ = แจกคนละใบ + สำรองในกอง) */
-export function deckCount(kind, n, { evil = false } = {}) {
+export function deckCount(kind, n, { evil = false, extras = false } = {}) {
   const col = n >= 6 ? 1 : 0;
   if (kind === 'ghost') return n - 1 - (evil ? 1 : 0);
   if (kind === 'evil') return evil ? 1 : 0;
   if (kind === 'talisman') return n + SPARE_TALISMANS[col];
-  return DECK[kind] ? DECK[kind][col] : 0;
+  return poolCounts(n, { extras })[kind] || 0;
 }
 
 // ---------- วาดหน้าการ์ดลง canvas (ใช้เป็น texture ในฉาก 3 มิติ) ----------

@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { act, resolvePending, createGame, autoAct, removePlayer, waitingOn } = require('../game/game');
-const { buildDeck, DECK_TABLE, EXTRA_TABLE } = require('../game/deck');
+const { buildDeck, EXTRA_TABLE, DECK_AFTER_DEAL } = require('../game/deck');
 const { viewFor } = require('../game/view');
 const { rig, player, kinds, uidOf, makeRng } = require('./helpers');
 
@@ -16,11 +16,11 @@ test('extra cards are only in the deck when the option is on', () => {
   const extra = count({ extras: true });
   for (const k of Object.keys(EXTRA_TABLE)) {
     assert.equal(plain.filter((c) => c.kind === k).length, 0);
-    assert.equal(extra.filter((c) => c.kind === k).length, EXTRA_TABLE[k][0]);
+    assert.ok(extra.filter((c) => c.kind === k).length >= 1, k);
   }
-  const base = Object.values(DECK_TABLE).reduce((s, v) => s + v[0], 0);
-  assert.equal(extra.length - plain.length, Object.values(EXTRA_TABLE).reduce((s, v) => s + v[0], 0));
-  assert.ok(plain.length > base);
+  // การ์ดเสริมแทรกเข้าไปในจำนวนเดิม กองหลังแจกยังเท่าเดิม
+  assert.equal(extra.length, plain.length);
+  assert.equal(buildDeck(4, makeRng(3), { extras: true }).deck.length, DECK_AFTER_DEAL);
   assert.equal(createGame(['A', 'B'], makeRng(1), { extras: true }).extras, true);
   assert.equal(viewFor(createGame(['A', 'B'], makeRng(1)), 'A').extras, false);
 });
