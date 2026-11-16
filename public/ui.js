@@ -336,6 +336,11 @@ function renderLobby(s) {
     const li = document.createElement('li');
     li.className = 'lobby-player' + (!p.online ? ' offline' : '') + (p.id === s.you ? ' is-you' : '');
     li.innerHTML = `<img class="player-avatar" src="${avatarUrl(p.id)}" width="48" height="48" alt=""><span class="player-name">${esc(p.name)}${p.bot ? ' <span class="badge">บอต</span>' : ''}${p.id === s.room.hostId ? ' <span class="host-mark" title="หัวห้อง">♛</span>' : ''}${p.id === s.you ? ' <small>(คุณ)</small>' : ''}${p.online ? '' : ' · หลุด'}</span>`;
+    const points = document.createElement('span');
+    points.className = 'player-points';
+    points.textContent = `${s.room.match.scores[p.id] || 0} / ${s.room.match.target}`;
+    points.setAttribute('aria-label', `${s.room.match.scores[p.id] || 0} แต้ม`);
+    li.append(points);
     if (isHost && p.id !== s.you) li.append(chip(p.bot ? 'เอาออก' : 'เตะ', () => send({ t: 'kick', id: p.id })));
     ul.append(li);
   }
@@ -467,6 +472,22 @@ function renderChain(fromEvent = false) {
   $('chain-status').className = `chain-status ${tone}`.trim();
 }
 
+function renderStandings(s) {
+  const match = s.room.match;
+  const current = new Map(s.room.players.map((p) => [p.id, p]));
+  const ids = [...new Set([...Object.keys(match.scores), ...current.keys()])];
+  ids.sort((a, b) => (match.scores[b] || 0) - (match.scores[a] || 0));
+  const list = $('winner-scores');
+  list.replaceChildren();
+  for (const id of ids) {
+    const row = document.createElement('li');
+    row.className = (id === match.winner ? 'match-champion ' : '') + (id === s.you ? 'score-you' : '');
+    const name = current.get(id)?.name || s.room.names[id] || '?';
+    row.innerHTML = `<img src="${avatarUrl(id)}" width="32" height="32" alt=""><span>${esc(name)}${id === s.you ? ' <small>(คุณ)</small>' : ''}${current.has(id) ? '' : '<small class="score-departed">ออกจากห้องแล้ว</small>'}</span><b>${match.scores[id] || 0} / ${match.target}</b>`;
+    list.append(row);
+  }
+}
+
 function renderGame(s) {
   showScreen('game');
   const g = s.game;
@@ -567,14 +588,24 @@ function renderGame(s) {
   // ผู้ชนะ
   $('winner').hidden = !g.winner;
   if (g.winner) {
-    $('winner-text').textContent = g.winner === you ? 'คุณรอดคนสุดท้าย ชนะ!' : `${nameOf(g.winner)} ชนะ!`;
+    const match = s.room.match;
+    const champion = match.winner;
+    $('winner-heading').textContent = champion ? 'ได้ผู้ชนะชุดนี้แล้ว' : `จบรอบที่ ${match.round}`;
+    $('winner-text').textContent = champion
+      ? (champion === you ? 'คุณชนะชุดนี้!' : `${nameOf(champion)} ชนะชุดนี้!`)
+      : (g.winner === you ? 'คุณชนะรอบนี้!' : `${nameOf(g.winner)} ชนะรอบนี้!`);
+    $('winner-detail').textContent = champion
+      ? `ชนะครบ ${match.target} รอบ · ${match.scores[champion]} แต้ม`
+      : `+1 แต้ม · ตอนนี้ ${match.scores[g.winner]} / ${match.target} แต้ม`;
+    renderStandings(s);
     const isHost = s.room.hostId === you;
     // เริ่มรอบใหม่ต้องมีคนออนไลน์อย่างน้อย 2 คน ถ้าเหลือคนเดียวให้เพิ่มบอตจากตรงนี้ได้เลย
     const online = s.room.players.filter((p) => p.online).length;
     $('again').hidden = !isHost;
     $('again').disabled = online < 2;
+    $('again').textContent = champion ? 'เริ่มชุดใหม่ · ล้างคะแนน' : 'เล่นรอบถัดไป';
     $('again-bot').hidden = !isHost || s.room.players.length >= MAX_SEATS;
-    $('again-hint').textContent = !isHost ? 'รอหัวห้องเริ่มรอบใหม่'
+    $('again-hint').textContent = !isHost ? (champion ? 'รอหัวห้องเริ่มชุดใหม่' : 'รอหัวห้องเริ่มรอบถัดไป')
       : online < 2 ? 'เหลือคุณคนเดียว เพิ่มบอตหรือชวนเพื่อนเข้าห้องก่อนเริ่มรอบใหม่' : '';
     renderOption(s, 'again-extras', 'extras');
     renderOption(s, 'again-evil', 'evil');
@@ -582,11 +613,16 @@ function renderGame(s) {
 
   // รายชื่อในเมนู
   const mp = $('menu-players');
+  $('menu-match').textContent = `รอบที่ ${s.room.match.round} · ชนะ ${s.room.match.target} รอบก่อน ชนะชุดนี้`;
   mp.innerHTML = '';
   for (const p of s.room.players) {
     const row = document.createElement('div');
     row.className = 'row-p' + (p.online ? '' : ' offline');
     row.innerHTML = `<span>${esc(p.name)}${p.bot ? ' · บอต' : ''}${p.id === s.room.hostId ? ' 👑' : ''}${p.seat === 'watch' ? ' · ดูอยู่' : ''}${p.online ? '' : ' · หลุด'}</span>`;
+    const points = document.createElement('b');
+    points.className = 'player-points';
+    points.textContent = `${s.room.match.scores[p.id] || 0} / ${s.room.match.target}`;
+    row.append(points);
     if (s.room.hostId === you && p.id !== you) row.append(chip(p.bot ? 'เอาออก' : 'เตะ', () => { if (confirm(`เอา ${p.name} ออกจากห้อง?`)) send({ t: 'kick', id: p.id }); }));
     mp.append(row);
   }

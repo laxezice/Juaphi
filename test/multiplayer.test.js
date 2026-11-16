@@ -141,6 +141,67 @@ test('the evil ghost option is off in a new room and only the host can switch it
   assert.equal(a.state.game.evil, true);
 });
 
+test('room scores survive reconnects and arrivals, stop at three, and reset only on a host start', async (t) => {
+  const srv = await startServer(t, { JUAPHI_BOT_MS: '60000', JUAPHI_SEED: '3' });
+  const [original, b] = await setupRoom(srv, ['ScoreHost', 'ScoreGuest']);
+  assert.deepEqual(original.state.room.match, { target: 3, round: 0, scores: {}, winner: null });
+  original.send({ t: 'start' });
+  await waitFor(() => original.state.game);
+  original.send({ t: 'kick', id: b.id });
+  await waitFor(() => original.state.game.winner);
+  assert.equal(original.state.room.match.scores[original.id], 1);
+
+  const a = await srv.client(original.name);
+  a.send({ t: 'join', room: original.room, name: original.name, secret: original.secret });
+  await waitFor(() => a.state);
+  assert.equal(a.id, original.id);
+  assert.equal(a.state.room.match.scores[a.id], 1);
+  const c = await srv.client('LateArrival');
+  c.send({ t: 'join', room: a.room, name: c.name, secret: c.secret });
+  await waitFor(() => c.state && a.state.room.players.length === 2);
+  assert.deepEqual(c.state.room.match, a.state.room.match);
+  assert.equal(Object.hasOwn(c.state.room.match, 'roundWinner'), false);
+  a.send({ t: 'options', extras: true });
+  await waitFor(() => a.state.room.extras);
+  assert.equal(a.state.room.match.scores[a.id], 1, 'finished-round room updates do not score again');
+  c.send({ t: 'start' });
+  await waitFor(() => c.errors.length === 1);
+  assert.equal(a.state.room.match.round, 1);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && !a.state.game.winner);
+  assert.equal(a.state.room.match.round, 2);
+  assert.equal(a.state.room.match.scores[a.id], 1);
+  assert.equal(a.state.room.match.scores[c.id], 0);
+  c.send({ t: 'leave' });
+  await waitFor(() => a.state.game.winner);
+  assert.equal(a.state.room.match.scores[a.id], 2);
+  assert.equal(a.state.room.match.winner, null);
+
+  a.send({ t: 'addBot' });
+  await waitFor(() => a.state.room.players.some((p) => p.bot));
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && !a.state.game.winner);
+  a.send({ t: 'kick', id: a.state.room.players.find((p) => p.bot).id });
+  await waitFor(() => a.state.game.winner);
+  assert.equal(a.state.room.match.scores[a.id], 3);
+  assert.equal(a.state.room.match.winner, a.id);
+  assert.equal(a.state.room.match.round, 3);
+  const d = await srv.client('NextMatchGuest');
+  d.send({ t: 'join', room: a.room, name: d.name, secret: d.secret });
+  await waitFor(() => d.state && a.state.room.players.length === 2);
+  d.send({ t: 'start' });
+  await waitFor(() => d.errors.length === 1);
+  assert.equal(d.state.room.match.winner, a.id);
+  a.send({ t: 'options', evil: true });
+  await waitFor(() => a.state.room.evil);
+  assert.equal(a.state.room.match.scores[a.id], 3);
+  a.send({ t: 'start' });
+  await waitFor(() => a.state.game && !a.state.game.winner);
+  assert.equal(a.state.room.match.round, 1);
+  assert.equal(a.state.room.match.winner, null);
+  assert.deepEqual(a.state.room.match.scores, { [a.id]: 0, [d.id]: 0 });
+});
+
 test('the next game starts with the player who was out first', { timeout: 20000 }, async (t) => {
   const srv = await startServer(t, { JUAPHI_NOPE_MS: '30', JUAPHI_SEED: '3' });
   const [a, b, c] = await setupRoom(srv, ['A', 'B', 'C']);
@@ -148,6 +209,7 @@ test('the next game starts with the player who was out first', { timeout: 20000 
   a.send({ t: 'start' });
   await waitFor(() => a.state.game && a.state.game.winner, 15000);
   stops.forEach((s) => s());
+  assert.equal(a.state.room.match.scores[a.state.game.winner], 1, 'a normal card-game win awards one point');
   const outFirst = a.msgs.map((x) => x.m).find((m) => m.t === 'event' && m.e && m.e.type === 'ghost' && !m.e.saved)
     || a.msgs.map((x) => x.m).find((m) => m.t === 'event' && m.event && m.event.type === 'ghost' && !m.event.saved);
   assert.ok(outFirst, 'someone was out');

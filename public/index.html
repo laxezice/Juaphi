@@ -13,7 +13,14 @@
   <!-- __V__ คือเลขรุ่นที่เซิร์ฟเวอร์ใส่ให้ตอนส่งหน้านี้ deploy ใหม่ = URL ใหม่ เบราว์เซอร์จะไม่ใช้โค้ดเก่าที่เก็บไว้ -->
   <meta name="juaphi-version" content="__V__">
   <link rel="stylesheet" href="style.css?v=__V__">
-  <style>:root { --btn-draw: url("/buttons/draw.webp?v=__V__"); --btn-nope: url("/buttons/nope.webp?v=__V__"); --brand-mark: url("/brand/mark.webp?v=__V__"); }</style>
+  <style>:root {
+    --btn-draw: url("/buttons/draw.webp?v=__V__");
+    --btn-nope: url("/buttons/nope.webp?v=__V__");
+    --brand-mark: url("/brand/mark.webp?v=__V__");
+    --bg-game: url("/backgrounds/game.webp?v=__V__");
+    --bg-game-mobile: url("/backgrounds/game-mobile.webp?v=__V__");
+    --bg-house: url("/backgrounds/home.webp?v=__V__");
+  }</style>
   <script type="importmap">{ "imports": {
     "/ui.js": "/ui.js?v=__V__",
     "/net.js": "/net.js?v=__V__",
@@ -88,6 +95,7 @@
       <img class="option-art" src="/cards/evil.webp?v=__V__" width="40" height="56" alt="">
       <span class="toggle-text"><b>ผีร้าย</b><small>ผี 1 ใบกลายเป็นผีร้าย จั่วได้ต้องใช้ยันต์ทั้งหมดในมือ</small></span>
     </label>
+    <p class="match-rule">ชนะรอบละ 1 แต้ม · ใครครบ 3 แต้มก่อน ชนะชุดนี้</p>
     <p id="lobby-hint" class="muted"></p>
     <button id="start" class="btn primary" hidden>เริ่มเกม</button>
     </section>
@@ -113,6 +121,7 @@
       <span id="vol-num" class="vol-num"></span>
     </div>
     <div id="menu" class="menu" hidden>
+      <p id="menu-match" class="match-rule"></p>
       <div id="menu-players"></div>
       <button id="game-leave" class="btn ghost small">ออกจากห้อง</button>
     </div>
@@ -142,8 +151,11 @@
     <div id="winner" class="winner" hidden>
       <div class="winner-box">
         <img class="winner-art" src="/brand/mark.webp?v=__V__" width="116" height="116" alt="">
-        <p class="eyebrow">รอดจากบ้านผีสิง</p>
+        <p id="winner-heading" class="eyebrow">รอดจากบ้านผีสิง</p>
         <div id="winner-text"></div>
+        <p id="winner-detail" class="muted"></p>
+        <p class="match-rule">คะแนนสะสม · ใครครบ 3 แต้มก่อนชนะ</p>
+        <ul id="winner-scores" class="scoreboard" aria-label="คะแนนสะสมในห้อง"></ul>
         <label id="again-extras" class="toggle" hidden>
           <input type="checkbox">
           <span class="toggle-text"><b>การ์ดเสริม</b><small>ไฟดับ · ผีเข้า · ขุดหลุมศพ · ผูกดวง · เดินถอยหลัง · จั่วก้นกอง</small></span>

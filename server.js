@@ -8,6 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const G = require('./game/game');
+const { createMatch, beginRound, recordRoundWin } = require('./game/match');
 const { summarizeRooms, startAdminSocket } = require('./admin');
 const { viewFor } = require('./game/view');
 const { makeRng } = require('./game/deck');
@@ -105,7 +106,7 @@ function newCode() {
 
 function createRoom() {
   const r = {
-    code: newCode(), hostId: null, players: [], names: {}, game: null, rng: null, extras: true, evil: false,   // ห้องใหม่เปิดการ์ดเสริมไว้ก่อน
+    code: newCode(), hostId: null, players: [], names: {}, game: null, match: createMatch(), rng: null, extras: true, evil: false,   // ห้องใหม่เปิดการ์ดเสริมไว้ก่อน
     windowTimer: null, windowEndsAt: 0, takeoverTimer: null, takeoverFor: null, idleTimer: null,
   };
   rooms.set(r.code, r);
@@ -160,6 +161,7 @@ function stateFor(r, p) {
       evil: r.evil,       // ตัวเลือกห้อง: ผีใบหนึ่งเป็นผีร้าย
       players: r.players.map((x) => ({ id: x.id, name: x.name, online: x.online, seat: x.seat, bot: !!x.bot })),
       names: r.names,
+      match: { target: r.match.target, round: r.match.round, scores: r.match.scores, winner: r.match.winner },
     },
     game: r.game ? viewFor(r.game, seatedInGame ? p.id : null) : null,
     windowLeftMs: r.game && r.game.pending && r.game.pending.kind === 'window' ? Math.max(0, r.windowEndsAt - Date.now()) : 0,
@@ -200,6 +202,7 @@ function ensureHost(r) {
 function afterChange(r, events) {
   if (events && events.length) deliver(r, events);
   const g = r.game;
+  if (g && g.winner) recordRoundWin(r.match, g.winner);
   if (g && g.winner) for (const p of r.players) if (!p.online) armDrop(r, p);
   clearTimeout(r.windowTimer);
   if (g && g.pending && g.pending.kind === 'window') {
@@ -286,6 +289,7 @@ function startGame(r) {
   // คนเริ่ม: คนที่ตกรอบคนแรกในเกมก่อน ถ้าไม่มี (เกมแรกของห้อง หรือคนนั้นไม่ได้เล่นรอบนี้) สุ่ม
   // ตอนเทสต์ (JUAPHI_SEED) ให้ที่นั่งแรกเริ่มเสมอ ผลจะได้ตายตัว
   const ids = seated.map((p) => p.id);
+  beginRound(r.match, ids);
   const prev = r.game && r.game.firstOut;
   const fromPrev = !!prev && ids.includes(prev);
   const first = fromPrev ? prev : ids[SEED != null ? 0 : Math.floor(Math.random() * ids.length)];

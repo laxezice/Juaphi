@@ -30,6 +30,9 @@ export async function createBoard(root, hooks) {
   root.innerHTML = '';
   root.classList.add('board2d');
   const seatsBox = el('div', 'b2-seats');
+  const matchStatus = el('div', 'b2-match-status');
+  const matchLabel = el('span');
+  matchStatus.append(matchLabel);
   const center = el('div', 'b2-center');
   const deck = el('button', 'b2-deck');
   deck.type = 'button';
@@ -121,7 +124,8 @@ export async function createBoard(root, hooks) {
       seatsBox.append(st.box);   // เรียงตามลำดับ
       const name = s.room.names[p.id] || '?';
       const current = !g.winner && g.current === p.id;
-      const key = `${name}|${p.handCount}|${p.alive}|${p.grudge}|${current}|${g.turnsLeft}`;
+      const score = s.room.match.scores[p.id] || 0;
+      const key = `${name}|${p.handCount}|${p.alive}|${p.grudge}|${current}|${g.turnsLeft}|${score}`;
       if (st.key === key) return;
       st.key = key;
       st.box.classList.toggle('current', current);
@@ -129,7 +133,7 @@ export async function createBoard(root, hooks) {
       // ที่นั่งแบบเรียบ: หลังการ์ดใบเดียวมีตัวเลขจำนวนใบ + ชื่อ (ไม่กางการ์ดหลายใบให้รก)
       const sub = !p.alive ? (p.grudge ? 'วิญญาณ · อาฆาตได้' : 'วิญญาณ') : '';
       const turns = current && g.turnsLeft > 1 ? `<i class="b2-turns">${g.turnsLeft} ตา</i>` : '';
-      st.plate.innerHTML = `<b>${esc(name)}</b>${sub ? `<small>${sub}</small>` : ''}${turns}`;
+      st.plate.innerHTML = `<b>${esc(name)} <span class="b2-score">${score}/${s.room.match.target}</span></b>${sub ? `<small>${sub}</small>` : ''}${turns}`;
       st.backs.innerHTML = '';
       st.backs.hidden = !p.alive;
       if (p.alive) {
@@ -137,6 +141,10 @@ export async function createBoard(root, hooks) {
         st.backs.append(el('span', 'b2-n', String(p.handCount)));
       }
     });
+    const match = s.room.match;
+    const playing = g.players.some((p) => p.id === s.you);
+    matchLabel.textContent = `รอบที่ ${match.round} · ${playing ? `คุณ ${match.scores[s.you] || 0}/${match.target} แต้ม · ` : ''}ชนะ ${match.target} รอบก่อนชนะชุด`;
+    seatsBox.append(matchStatus);
   }
 
   // ---------- การ์ดในมือ ----------
